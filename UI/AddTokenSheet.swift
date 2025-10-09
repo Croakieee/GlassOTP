@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import AVFoundation
+import Vision
 
 enum AddMode: String, CaseIterable {
     case otpauth = "Ссылка / QR"
@@ -26,6 +28,13 @@ struct AddTokenSheet: View {
     @State private var errorMessage: String?
     @State private var isDropping: Bool = false
 
+    // camera scanner
+    @State private var showCameraScanner: Bool = false
+    @State private var cameraRunning: Bool = false
+
+    // small success hint
+    @State private var addedMessage: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
@@ -48,38 +57,10 @@ struct AddTokenSheet: View {
             }
             .pickerStyle(SegmentedPickerStyle())
 
-            Group {
-                if mode == .otpauth {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Вставьте ссылку **otpauth://…** или **otpauth-migration://…** (экспорт Google Authenticator). Либо перетащите сюда изображение/скриншот с QR-кодом.")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-
-                        TextEditor(text: $otpauthText)
-                            .font(.system(size: 12, weight: .regular, design: .monospaced))
-                            .frame(minHeight: 84)
-                            .padding(8)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
-
-                        dropZone
-
-                        HStack(spacing: 8) {
-                            Button(action: importFromImageFile) {
-                                Label("Выбрать изображение…", systemImage: "folder")
-                            }
-                            Button(action: importFromClipboard) {
-                                Label("Вставить из буфера", systemImage: "doc.on.clipboard")
-                            }
-                            Spacer()
-                            Button(action: pasteFromClipboardIfText) {
-                                Label("Вставить ссылку", systemImage: "link")
-                            }
-                        }
-                    }
-                } else {
-                    manualFields
-                }
+            if mode == .otpauth {
+                otpauthBlock
+            } else {
+                manualFields
             }
 
             if let err = errorMessage {
@@ -87,6 +68,14 @@ struct AddTokenSheet: View {
                     Image(systemName: "exclamationmark.triangle").foregroundColor(.orange)
                     Text(err).foregroundColor(.orange).font(.footnote)
                 }
+            }
+
+            if let msg = addedMessage {
+                HStack {
+                    Image(systemName: "checkmark.seal.fill").foregroundColor(.green)
+                    Text(msg).font(.footnote).foregroundColor(.green)
+                }
+                .transition(.opacity)
             }
 
             HStack {
@@ -99,7 +88,126 @@ struct AddTokenSheet: View {
             .padding(.top, 2)
         }
         .padding(18)
+        // camera sheet
+        .sheet(isPresented: $showCameraScanner, onDismiss: { cameraRunning = false }) {
+            VStack {
+                HStack {
+                    Text("Сканировать QR").font(.headline)
+                    Spacer()
+                    Button("Закрыть") { showCameraScanner = false }
+                }
+                .padding([.top, .horizontal])
+                Divider()
+                QRCameraScannerView(onFound: { found in
+                    DispatchQueue.main.async {
+                        self.otpauthText = found
+                        self.showCameraScanner = false
+                    }
+                }, isRunning: $cameraRunning)
+                    .frame(minHeight: 360)
+                    .padding()
+                Spacer()
+            }
+            .frame(minWidth: 520, minHeight: 420)
+            .onAppear {
+                AVCaptureDevice.requestAccess(for: .video) { _ in
+                    DispatchQueue.main.async { self.cameraRunning = true }
+                }
+            }
+            .onDisappear { cameraRunning = false }
+        }
     }
+
+    private var otpauthBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Вставьте ссылку **otpauth://…** или **otpauth-migration://…** (экспорт Google Authenticator). Либо перетащите сюда изображение/скриншот с QR-кодом.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+
+            TextEditor(text: $otpauthText)
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                .frame(minHeight: 84)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+
+            dropZone
+
+            HStack(spacing: 8) {
+                Button(action: importFromImageFile) {
+                    Label("Выбрать изображение…", systemImage: "folder")
+                }
+                Button(action: importFromClipboard) {
+                    Label("Вставить из буфера", systemImage: "doc.on.clipboard")
+                }
+                Button(action: { startCameraScanner() }) {
+                    Label("Сканировать с камеры", systemImage: "camera")
+                }
+                Spacer()
+                Button(action: pasteFromClipboardIfText) {
+                    Label("Вставить ссылку", systemImage: "link")
+                }
+            }
+        }
+    }
+
+    // MARK: - Drop zone
+    private var dropZone: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isDropping ? Color.accentColor.opacity(0.15) : Color.black.opacity(0.06))
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+
+            VStack(spacing: 6) {
+                Image(systemName: "tray.and.arrow.down")
+                Text("Перетащите сюда изображение с QR")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+            .padding(12)
+        }
+        .frame(height: 84)
+        .onDrop(of: ["public.file-url", "public.tiff", "public.png", "public.jpeg"], isTargeted: $isDropping) { providers -> Bool in
+            guard let item = providers.first else { return false }
+            var handled = false
+
+            // 1) Файл-URL
+            if item.hasItemConformingToTypeIdentifier("public.file-url") {
+                item.loadItem(forTypeIdentifier: "public.file-url", options: nil) { (data, _) in
+                    if let urlData = data as? Data,
+                       let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                        DispatchQueue.main.async { self.importImage(at: url) }
+                    } else if let url = data as? URL {
+                        DispatchQueue.main.async { self.importImage(at: url) }
+                    }
+                }
+                handled = true
+            }
+
+            // 2) raw images
+            if item.hasItemConformingToTypeIdentifier("public.tiff") {
+                item.loadDataRepresentation(forTypeIdentifier: "public.tiff") { data, _ in
+                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
+                }
+                handled = true
+            } else if item.hasItemConformingToTypeIdentifier("public.png") {
+                item.loadDataRepresentation(forTypeIdentifier: "public.png") { data, _ in
+                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
+                }
+                handled = true
+            } else if item.hasItemConformingToTypeIdentifier("public.jpeg") {
+                item.loadDataRepresentation(forTypeIdentifier: "public.jpeg") { data, _ in
+                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
+                }
+                handled = true
+            }
+
+            return handled
+        }
+    }
+
+    // MARK: - Actions
 
     private var canSubmit: Bool {
         switch mode {
@@ -179,63 +287,6 @@ struct AddTokenSheet: View {
         }
     }
 
-    private var dropZone: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isDropping ? Color.accentColor.opacity(0.15) : Color.black.opacity(0.06))
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-
-            VStack(spacing: 6) {
-                Image(systemName: "tray.and.arrow.down")
-                Text("Перетащите сюда изображение с QR")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
-            .padding(12)
-        }
-        .frame(height: 84)
-        .onDrop(of: ["public.file-url", "public.tiff", "public.png", "public.jpeg"], isTargeted: $isDropping) { providers -> Bool in
-            guard let item = providers.first else { return false }
-            var handled = false
-
-            // 1) Файл-URL
-            if item.hasItemConformingToTypeIdentifier("public.file-url") {
-                item.loadItem(forTypeIdentifier: "public.file-url", options: nil) { (data, _) in
-                    if let urlData = data as? Data,
-                       let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                        DispatchQueue.main.async { self.importImage(at: url) }
-                    } else if let url = data as? URL {
-                        DispatchQueue.main.async { self.importImage(at: url) }
-                    }
-                }
-                handled = true
-            }
-
-            // 2) Сырые изображения
-            if item.hasItemConformingToTypeIdentifier("public.tiff") {
-                item.loadDataRepresentation(forTypeIdentifier: "public.tiff") { data, _ in
-                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
-                }
-                handled = true
-            } else if item.hasItemConformingToTypeIdentifier("public.png") {
-                item.loadDataRepresentation(forTypeIdentifier: "public.png") { data, _ in
-                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
-                }
-                handled = true
-            } else if item.hasItemConformingToTypeIdentifier("public.jpeg") {
-                item.loadDataRepresentation(forTypeIdentifier: "public.jpeg") { data, _ in
-                    if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
-                }
-                handled = true
-            }
-
-            return handled
-        }
-    }
-
-    // MARK: - Actions
-
     private func addAction() {
         errorMessage = nil
         do {
@@ -248,10 +299,25 @@ struct AddTokenSheet: View {
                 list = [try buildManualImported()]
             }
             onAddMany(list)
-            onClose()
+
+            // показываем краткий success и очищаем поля, оставляя окно открытым
+            withAnimation { addedMessage = "Добавлено \(list.count) токен(ов)" }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
+            clearAllFields()
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    private func clearAllFields() {
+        otpauthText = ""
+        issuer = ""
+        account = ""
+        secretBase32 = ""
+        digits = "6"
+        period = "30"
+        algorithmIndex = 0
+        errorMessage = nil
     }
 
     private func buildManualImported() throws -> ImportedToken {
@@ -315,6 +381,29 @@ struct AddTokenSheet: View {
             self.otpauthText = link
         } catch {
             self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    // Camera helper
+    private func startCameraScanner() {
+        // проверим доступ
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            showCameraScanner = true
+            cameraRunning = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    if granted {
+                        self.showCameraScanner = true
+                        self.cameraRunning = true
+                    } else {
+                        self.errorMessage = "Доступ к камере запрещён."
+                    }
+                }
+            }
+        default:
+            errorMessage = "Доступ к камере запрещён. Разрешите в System Settings → Security & Privacy."
         }
     }
 }
