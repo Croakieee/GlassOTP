@@ -17,3 +17,5 @@ chown -R $USER
 chmod -R 777
 
 These commands remove extended attributes, adjust permissions, and ensure the application can be executed properly.
+
+After that, you can start Auto Fix and select my application and run the fix so it launches correctly.
