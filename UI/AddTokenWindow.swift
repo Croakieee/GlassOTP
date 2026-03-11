@@ -13,8 +13,8 @@ final class AddTokenWindowController: NSWindowController {
 
     func show(onAddMany: @escaping ([ImportedToken]) -> Void) {
         if let win = window {
+            NSApp.activate(ignoringOtherApps: true)
             win.makeKeyAndOrderFront(nil)
-            // не активируем приложение, чтобы не светиться в Dock
             return
         }
 
@@ -36,7 +36,7 @@ final class AddTokenWindowController: NSWindowController {
         win.contentViewController = host
         win.isReleasedWhenClosed = false
 
-        // 🔽 Главное изменение: обычный уровень окна
+        // обычный уровень окна
         win.level = .normal
 
         // фиксируем размеры
@@ -47,12 +47,13 @@ final class AddTokenWindowController: NSWindowController {
         // поведение/эстетика
         win.center()
         win.isMovableByWindowBackground = true
-        win.collectionBehavior = [.fullScreenNone] // можно убрать, не критично
-        win.hidesOnDeactivate = false              // при переключении приложений остаётся, но НЕ поверх
+        win.collectionBehavior = [.fullScreenNone]
+        win.hidesOnDeactivate = false
 
         self.window = win
 
-        // показываем, не активируя приложение (чтобы не появляться в Dock)
+        // активируем приложение чтобы окно было поверх
+        NSApp.activate(ignoringOtherApps: true)
         win.makeKeyAndOrderFront(nil)
     }
 
@@ -62,4 +63,3 @@ final class AddTokenWindowController: NSWindowController {
         window = nil
     }
 }
-
