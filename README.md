@@ -1,51 +1,63 @@
-GlassOPT — Installation Guide
-Installation
-```
-\\\
-When launching the GlassOTP app for the first time, it will ask several times for permission to create
-and modify its folder in the Keychain. Unfortunately, it may also request these permissions again after
-updates. However, once the permissions are granted (sometimes multiple times), everything works correctly 
-and the keys are not reset.
-\\\
-```
-Extract the downloaded ZIP archive.
+# GlassOTP
 
-Move GlassOPT.app to your Applications folder.
+## Installation Guide
 
-Launch the application by holding the Control key and clicking the app, then select Open.
+### First Launch
 
-macOS Security Warning (AutoFix)
+When launching the **GlassOTP** app for the first time, it may request permission multiple times to create and modify its folder in the macOS **Keychain**.
 
-On newer versions of macOS, you may see a security warning saying that the application is damaged and cannot be opened. This happens because macOS Gatekeeper blocks apps that are not signed by an identified developer.
+This is expected behavior on unsigned applications. In some cases the permissions may also be requested again after updates. Once permissions are granted, the application works normally and the stored keys will not be reset.
 
-Example warning:
+---
 
-“The application ‘Example’ is damaged and can’t be opened. You should move it to the Trash.”
+## Installation
 
-If you encounter this issue, you can fix it using the included AutoFix tool.
+1. Extract the downloaded **ZIP archive**.
+2. Move **GlassOTP.app** to your **Applications** folder.
+3. Launch the application by **holding the Control key**, clicking the app, and selecting **Open**.
 
-Using AutoFix
+---
 
-Launch AutoFix.app.
+## macOS Security Warning (AutoFix)
 
-If this is the first launch, you may see the message:
+On newer versions of macOS you may see a security warning saying that the application is damaged and cannot be opened.
 
-“The application ‘Auto Fix’ can’t be opened because the developer cannot be verified.”
+Example message:
 
-How to open it:
+> “The application is damaged and can’t be opened. You should move it to the Trash.”
 
-Right-click (or hold Control and click) on AutoFix.app
+This happens because **macOS Gatekeeper** blocks applications that are not signed by an identified developer.
 
-Select Open from the context menu
+To resolve this issue you can use the included **AutoFix** tool.
 
-In the dialog window, click Open again to confirm
+---
 
-After opening AutoFix, select GlassOPT.app and run the fix.
+## Using AutoFix
 
-What AutoFix Does
+1. Launch **AutoFix.app**.
 
-AutoFix runs several system commands with sudo privileges to remove macOS security flags and fix permissions:
-```
+If this is the first launch, macOS may display:
+
+> “AutoFix can't be opened because the developer cannot be verified.”
+
+### How to open it
+
+1. Right‑click (or **Control + Click**) on **AutoFix.app**
+2. Select **Open**
+3. In the dialog window click **Open** again
+
+After launching AutoFix:
+
+1. Select **GlassOTP.app**
+2. Run the fix
+
+---
+
+## What AutoFix Does
+
+AutoFix runs several system commands with **sudo privileges** to remove macOS security flags and fix permissions:
+
+```bash
 xattr -c -r
 xattr -r -d
 chmod +x
@@ -55,19 +67,24 @@ chmod -R 777
 
 These commands:
 
-Remove extended attributes added by macOS
+* Remove extended attributes added by macOS
+* Fix application permissions
+* Ensure the application can run properly
 
-Fix application permissions
+---
 
-Ensure the application can run properly
+## After Fixing
 
-After Fixing
+Once the process is complete, **GlassOTP** should launch normally without macOS blocking it.
 
-Once the process is complete, GlassOPT should launch normally without macOS blocking it.
+---
 
+## Manual Fix (Alternative)
 
-If you do not want to use AutoFix, you can simply run the following command:
+If you do not want to use AutoFix, you can run the following command manually:
+
+```bash
+sudo xattr -r -c /Applications/APP.app
 ```
-sudo xattr -r -c /Applications/LockedApp.app
-```
-Replace LockedApp.app with the name of the damaged application.
+
+Replace `APP.app` with the name of the application if it differs.
