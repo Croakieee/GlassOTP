@@ -1,5 +1,5 @@
 # GlassOTP
-![Main Window](screenshots/main.png) 
+![Main Window](screenshots/main1.png) 
 ## Installation Guide
 
 ### First Launch
