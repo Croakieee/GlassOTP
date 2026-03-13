@@ -41,7 +41,12 @@ struct TokenListView: View {
                             period: token.period
                         ) {
                             copyToClipboard(store.code(for: token))
-                            if autoCloseOnCopy { NSApp.keyWindow?.performClose(nil) }
+                            // Время задержки после копирования ключа ( когда попап не прикреплен ) 
+                            if autoCloseOnCopy {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                    NSApp.keyWindow?.performClose(nil)
+                                }
+                            }
                         }
                         .contextMenu {
                             Button(token.isPinned ? "Открепить" : "Закрепить") {
