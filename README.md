@@ -2,7 +2,10 @@ GlassOPT — Installation Guide
 Installation
 ```
 \\\
-When launching the GlassOTP app for the first time, it will ask several times for permission to create and modify its folder in the Keychain. Unfortunately, it may also request these permissions again after updates. However, once the permissions are granted (sometimes multiple times), everything works correctly and the keys are not reset.
+When launching the GlassOTP app for the first time, it will ask several times for permission to create
+and modify its folder in the Keychain. Unfortunately, it may also request these permissions again after
+updates. However, once the permissions are granted (sometimes multiple times), everything works correctly 
+and the keys are not reset.
 \\\
 ```
 Extract the downloaded ZIP archive.
