@@ -10,6 +10,7 @@ struct TokenListView: View {
     let onRename: (UUID) -> Void
     let onEditSecret: (UUID) -> Void
     let onDelete: (UUID) -> Void
+    let onShowQR: (UUID) -> Void
 
     var body: some View {
         let items = store.filteredTokens()
@@ -55,6 +56,10 @@ struct TokenListView: View {
 
                             Button("Переименовать…") {
                                 onRename(token.id)
+                            }
+                            
+                            Button("Показать QR-код") {
+                                onShowQR(token.id)
                             }
 
                             Button("Показать / изменить секрет…") {

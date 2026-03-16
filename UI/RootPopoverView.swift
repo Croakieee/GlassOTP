@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
@@ -16,6 +17,12 @@ struct RootPopoverView: View {
 
     // edit secret
     @State private var editSecretToken: OTPToken?
+
+    // QR
+    @State private var qrToken: OTPToken?
+
+    // auth cache
+    @State private var lastAuthTime: Date?
 
     // delete confirm
     @State private var deleteTokenID: UUID?
@@ -36,7 +43,6 @@ struct RootPopoverView: View {
             VStack(alignment: .leading, spacing: 12) {
 
                 header
-
                 searchField
 
                 TokenListView(
@@ -46,7 +52,8 @@ struct RootPopoverView: View {
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
-                    onDelete: { id in beginDelete(id) }
+                    onDelete: { id in beginDelete(id) },
+                    onShowQR: { id in beginShowQR(id) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -56,7 +63,6 @@ struct RootPopoverView: View {
         }
         .background(Color.clear)
 
-        // rename sheet
         .sheet(item: $renameHandle, onDismiss: {
             renameIssuer = ""
             renameAccount = ""
@@ -74,7 +80,6 @@ struct RootPopoverView: View {
             }
         }
 
-        // edit secret sheet
         .sheet(item: $editSecretToken) { token in
 
             EditSecretView(
@@ -86,7 +91,17 @@ struct RootPopoverView: View {
 
         }
 
-        // delete alert
+        .sheet(item: $qrToken) { token in
+
+            TokenQRView(
+                token: token,
+                store: store
+            ) {
+                qrToken = nil
+            }
+
+        }
+
         .alert(isPresented: $showDeleteAlert) {
 
             Alert(
@@ -206,6 +221,47 @@ struct RootPopoverView: View {
         .padding(.top, 4)
     }
 
+    // MARK: Auth helpers
+
+    private func isAuthRecent() -> Bool {
+        guard let lastAuthTime else { return false }
+        return Date().timeIntervalSince(lastAuthTime) < 30
+    }
+
+    private func authenticate(_ completion: @escaping (Bool) -> Void) {
+
+        if isAuthRecent() {
+            completion(true)
+            return
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+
+        let context = LAContext()
+        var error: NSError?
+
+        let reason = "Подтвердите доступ к защищённым данным OTP"
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
+
+                DispatchQueue.main.async {
+
+                    if success {
+                        lastAuthTime = Date()
+                    }
+
+                    completion(success)
+                }
+
+            }
+
+        } else {
+            completion(true)
+        }
+    }
+
     // MARK: Actions
 
     private func beginRename(_ id: UUID) {
@@ -220,9 +276,29 @@ struct RootPopoverView: View {
 
     private func beginEditSecret(_ id: UUID) {
 
-        guard let t = store.tokens.first(where: { $0.id == id }) else { return }
+        authenticate { success in
 
-        editSecretToken = t
+            guard success else { return }
+
+            if let t = store.tokens.first(where: { $0.id == id }) {
+                editSecretToken = t
+            }
+
+        }
+
+    }
+
+    private func beginShowQR(_ id: UUID) {
+
+        authenticate { success in
+
+            guard success else { return }
+
+            if let t = store.tokens.first(where: { $0.id == id }) {
+                qrToken = t
+            }
+
+        }
 
     }
 

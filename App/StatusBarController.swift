@@ -25,7 +25,6 @@ final class StatusBarController: NSObject {
             button.action = #selector(togglePopover(_:))
         }
 
-        // Реакция на смену режима pin
         cancellable = appState.$pinPopover.sink { [weak self] pinned in
             self?.applyPinBehavior(pinned: pinned)
         }
@@ -38,14 +37,13 @@ final class StatusBarController: NSObject {
     }
 
     private func applyPinBehavior(pinned: Bool) {
-        // режим поповера
         popover.behavior = pinned ? .applicationDefined : .transient
 
-        // клик вне — закрывать только когда НЕ pinned
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
         }
+
         if !pinned {
             eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 guard let self = self else { return }
@@ -66,7 +64,7 @@ final class StatusBarController: NSObject {
         guard let button = statusItem.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
-        //NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func closePopover(sender: Any?) {
