@@ -79,6 +79,9 @@ The repository includes a helper tool named **AutoFix.app**.
 
 This project uses AutoFix-related solutions.  
 [![Thanks to Appstorrent](https://img.shields.io/badge/Thanks-Appstorrent-blue?style=flat-square)](https://appstorrent.ru/200-mistakes.html)
+
+[![Appstorrent](https://img.shields.io/badge/Visit-Appstorrent-blue?style=for-the-badge)](https://appstorrent.ru/)
+
 AutoFix removes macOS quarantine flags and corrects application permissions.
 
 ### Using AutoFix
