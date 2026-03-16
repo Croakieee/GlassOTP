@@ -17,7 +17,6 @@ It allows you to quickly access one-time authentication codes without opening a 
 * Token pinning and sorting
 * Automatic copy to clipboard with optional auto-close
 * Real-time countdown timer for each token
-* Lightweight design with minimal CPU usage
 
 ## Security
 
