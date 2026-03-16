@@ -184,3 +184,27 @@ GlassOTP is an open source project provided without warranty.
 Use it at your own risk.
 
 For maximum security, always keep backup codes for your accounts.
+
+## ☕ Support the Project
+
+If you like this project and want to support its development, you can buy me a coffee using **USDT (TRC20)**.
+
+<div align="center">
+
+<a href="https://tronscan.org/#/address/TKy58zzJkoTzab3XZXE5YpZVpH3oRoghjg">
+  <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-USDT%20(TRC20)-ff813f?style=for-the-badge&logo=buymeacoffee&logoColor=white" />
+</a>
+
+</div>
+
+<p align="center">
+
+**USDT (TRC20) Wallet**
+
+`TKy58zzJkoTzab3XZXE5YpZVpH3oRoghjg`
+
+</p>
+
+---
+
+⭐ Any support helps keep the project improving and maintained.
