@@ -3,6 +3,7 @@ import SwiftUI
 private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
 struct RootPopoverView: View {
+
     @StateObject private var store = OTPStore.sampleStore()
     @ObservedObject private var appState = AppState.shared
 
@@ -13,12 +14,17 @@ struct RootPopoverView: View {
     @State private var renameIssuer: String = ""
     @State private var renameAccount: String = ""
 
+    // edit secret
+    @State private var editSecretToken: OTPToken?
+
     // delete confirm
     @State private var deleteTokenID: UUID?
     @State private var showDeleteAlert: Bool = false
 
     var body: some View {
+
         ZStack {
+
             VisualEffectBackground(material: .hud, blendingMode: .behindWindow)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
@@ -28,75 +34,127 @@ struct RootPopoverView: View {
                 .padding(6)
 
             VStack(alignment: .leading, spacing: 12) {
+
                 header
+
                 searchField
+
                 TokenListView(
                     store: store,
                     timer: store.timer,
                     autoCloseOnCopy: $autoCloseOnCopy,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
+                    onEditSecret: { id in beginEditSecret(id) },
                     onDelete: { id in beginDelete(id) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                 footer
             }
             .padding(16)
         }
         .background(Color.clear)
-        // РАНЬШЕ здесь был .sheet(isPresented: $showAddSheet) — его удалить!
-        // Лист переименования оставляем:
-        .sheet(item: $renameHandle, onDismiss: { renameIssuer = ""; renameAccount = "" }) { _ in
+
+        // rename sheet
+        .sheet(item: $renameHandle, onDismiss: {
+            renameIssuer = ""
+            renameAccount = ""
+        }) { _ in
+
             RenameTokenSheet(
                 originalIssuer: renameIssuer,
                 originalAccount: renameAccount
             ) { newIssuer, newAccount in
+
                 if let id = renameHandle?.id {
                     store.rename(id, issuer: newIssuer, account: newAccount)
                 }
+
             }
         }
+
+        // edit secret sheet
+        .sheet(item: $editSecretToken) { token in
+
+            EditSecretView(
+                token: token,
+                store: store
+            ) {
+                editSecretToken = nil
+            }
+
+        }
+
+        // delete alert
         .alert(isPresented: $showDeleteAlert) {
+
             Alert(
                 title: Text("Удалить токен?"),
                 message: Text("Действие нельзя отменить. Секрет будет удалён из связки ключей."),
                 primaryButton: .destructive(Text("Удалить")) {
-                    if let id = deleteTokenID { store.remove(id) }
+
+                    if let id = deleteTokenID {
+                        store.remove(id)
+                    }
+
                     deleteTokenID = nil
                 },
-                secondaryButton: .cancel { deleteTokenID = nil }
+                secondaryButton: .cancel {
+                    deleteTokenID = nil
+                }
             )
+
         }
     }
 
+    // MARK: Header
+
     private var header: some View {
+
         HStack {
+
             Image(systemName: "key.fill")
                 .imageScale(.medium)
                 .foregroundColor(.primary.opacity(0.8))
+
             Text("GlassOTP")
                 .font(.headline)
                 .foregroundColor(.primary)
+
             Spacer()
+
             Button(action: {
+
                 AddTokenWindowController.shared.show { list in
                     store.addImportedMany(list)
                 }
+
             }) {
+
                 Image(systemName: "plus")
+
             }
             .buttonStyle(BorderlessButtonStyle())
             .help("Добавить токен")
+
         }
     }
 
+    // MARK: Search
+
     private var searchField: some View {
+
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+
             TextField("Поиск по аккаунтам…", text: $store.query)
                 .textFieldStyle(PlainTextFieldStyle())
                 .disableAutocorrection(true)
                 .font(.system(size: 13, weight: .regular, design: .rounded))
+
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -106,40 +164,73 @@ struct RootPopoverView: View {
         )
     }
 
+    // MARK: Footer
+
     private var footer: some View {
+
         VStack(spacing: 8) {
+
             HStack {
+
                 Toggle(isOn: $autoCloseOnCopy) {
                     Text("Закрывать после копирования")
-                        .font(.footnote).foregroundColor(.secondary)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 .toggleStyle(SwitchToggleStyle())
+
                 Spacer()
+
             }
+
             HStack {
+
                 Toggle(isOn: $appState.pinPopover) {
                     Text("Прикрепить поповер")
-                        .font(.footnote).foregroundColor(.secondary)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 .toggleStyle(SwitchToggleStyle())
+
                 Spacer()
-                Button(action: { NSApplication.shared.terminate(nil) }) { Text("Выход") }
+
+                Button(action: {
+                    NSApplication.shared.terminate(nil)
+                }) {
+                    Text("Выход")
+                }
+
             }
+
         }
         .padding(.top, 4)
     }
 
-    // MARK: - Actions
+    // MARK: Actions
 
     private func beginRename(_ id: UUID) {
+
         guard let t = store.tokens.first(where: { $0.id == id }) else { return }
+
         renameIssuer = t.issuer
         renameAccount = t.account
         renameHandle = RenameHandle(id: id)
+
+    }
+
+    private func beginEditSecret(_ id: UUID) {
+
+        guard let t = store.tokens.first(where: { $0.id == id }) else { return }
+
+        editSecretToken = t
+
     }
 
     private func beginDelete(_ id: UUID) {
+
         deleteTokenID = id
         showDeleteAlert = true
+
     }
+
 }

@@ -116,4 +116,22 @@ final class OTPStore: ObservableObject {
 
     // для инициализации в RootPopoverView
     static func sampleStore() -> OTPStore { OTPStore(tokens: []) }
+    
+    // MARK: - Secret editing
+
+    func secret(for token: OTPToken) -> String? {
+        guard let data = try? KeychainService.getSecret(for: token.id) else { return nil }
+        return Base32.encode(data)
+    }
+
+    func updateSecret(for token: OTPToken, base32: String) throws {
+
+        guard let decoded = Base32.decode(base32) else {
+            throw ImportError.badBase32
+        }
+
+        try KeychainService.setSecret(decoded, for: token.id)
+
+        objectWillChange.send()
+    }
 }

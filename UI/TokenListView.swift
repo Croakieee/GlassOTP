@@ -6,9 +6,9 @@ struct TokenListView: View {
     @ObservedObject var timer: TimeStepTimer
     @Binding var autoCloseOnCopy: Bool
 
-    // колбэки для действий
     let onPin: (UUID) -> Void
     let onRename: (UUID) -> Void
+    let onEditSecret: (UUID) -> Void
     let onDelete: (UUID) -> Void
 
     var body: some View {
@@ -41,16 +41,28 @@ struct TokenListView: View {
                             period: token.period
                         ) {
                             copyToClipboard(store.code(for: token))
-                            if autoCloseOnCopy { NSApp.keyWindow?.performClose(nil) }
+
+                            if autoCloseOnCopy {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                    NSApp.keyWindow?.performClose(nil)
+                                }
+                            }
                         }
                         .contextMenu {
                             Button(token.isPinned ? "Открепить" : "Закрепить") {
                                 onPin(token.id)
                             }
+
                             Button("Переименовать…") {
                                 onRename(token.id)
                             }
+
+                            Button("Показать / изменить секрет…") {
+                                onEditSecret(token.id)
+                            }
+
                             Divider()
+
                             Button("Удалить") {
                                 onDelete(token.id)
                             }
