@@ -7,6 +7,9 @@ final class OTPStore: ObservableObject {
 
     let timer = TimeStepTimer()
 
+    // КЕШ СЕКРЕТОВ (добавлено)
+    private var secretCache: [UUID: Data] = [:]
+
     // MARK: - Init
 
     init(tokens: [OTPToken] = []) {
@@ -29,9 +32,16 @@ final class OTPStore: ObservableObject {
         }
     }
 
+    // ИСПРАВЛЕНО (использует кеш)
     func code(for token: OTPToken) -> String {
+
+        if let cached = secretCache[token.id] {
+            return TOTPGenerator.code(for: timer.now, token: token, secret: cached)
+        }
+
         do {
             let secret = try KeychainService.getSecret(for: token.id)
+            secretCache[token.id] = secret
             return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
         } catch {
             return "------"
@@ -46,6 +56,7 @@ final class OTPStore: ObservableObject {
 
     func addImported(_ imported: ImportedToken) {
         try? KeychainService.setSecret(imported.secret, for: imported.token.id)
+        secretCache[imported.token.id] = imported.secret
         tokens.append(imported.token)
         commit()
     }
@@ -54,6 +65,7 @@ final class OTPStore: ObservableObject {
         var changed = false
         for item in list {
             try? KeychainService.setSecret(item.secret, for: item.token.id)
+            secretCache[item.token.id] = item.secret
             tokens.append(item.token)
             changed = true
         }
@@ -70,6 +82,10 @@ final class OTPStore: ObservableObject {
             let token = tokens[idx]
             tokens.remove(at: idx)
             try? KeychainService.deleteSecret(for: token.id)
+
+            // очистка кеша
+            secretCache[tokenID] = nil
+
             commit()
         }
     }
@@ -114,7 +130,6 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    // для инициализации в RootPopoverView
     static func sampleStore() -> OTPStore { OTPStore(tokens: []) }
     
     // MARK: - Secret editing
@@ -131,6 +146,9 @@ final class OTPStore: ObservableObject {
         }
 
         try KeychainService.setSecret(decoded, for: token.id)
+
+        // обновление кеша
+        secretCache[token.id] = decoded
 
         objectWillChange.send()
     }

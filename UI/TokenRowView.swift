@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct TokenRowView: View {
+struct TokenRowView: View, Equatable {
     let title: String
     let code: String
     let remaining: Int
@@ -118,5 +118,10 @@ struct TokenRowView: View {
                 copied = false
             }
         }
+    }
+    
+    static func == (lhs: TokenRowView, rhs: TokenRowView) -> Bool {
+        lhs.code == rhs.code &&
+        lhs.remaining == rhs.remaining
     }
 }
