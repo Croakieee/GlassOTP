@@ -1,43 +1,92 @@
-GlassOPT — Installation Guide
-Installation
+# GlassOTP
 
-Extract the downloaded ZIP archive.
+GlassOTP is a lightweight TOTP authenticator for macOS designed to live in your menu bar.
+It allows you to quickly access one-time authentication codes without opening a full application window.
 
-Move GlassOPT.app to your Applications folder.
 
-Launch the application by holding the Control key and clicking the app, then select Open.
+## Features
 
-macOS Security Warning (AutoFix)
+* Menu bar TOTP authenticator for macOS
+* Supports standard `otpauth://` links
+* QR code import from images or camera
+* Manual token entry
+* Secure secret storage using macOS Keychain
+* Touch ID / system password authentication before viewing secrets
+* QR code export for adding tokens to other authenticators
+* Token renaming and editing
+* Token pinning and sorting
+* Automatic copy to clipboard with optional auto-close
+* Real-time countdown timer for each token
+* Lightweight design with minimal CPU usage
 
-On newer versions of macOS, you may see a security warning saying that the application is damaged and cannot be opened. This happens because macOS Gatekeeper blocks apps that are not signed by an identified developer.
+## Security
 
-Example warning:
+GlassOTP stores all token secrets inside the **macOS Keychain**.
+Secrets are never stored in plain text on disk.
 
-“The application ‘Example’ is damaged and can’t be opened. You should move it to the Trash.”
+Sensitive actions such as:
 
-If you encounter this issue, you can fix it using the included AutoFix tool.
+* Viewing a secret key
+* Displaying a token QR code
 
-Using AutoFix
+require authentication via:
 
-Launch AutoFix.app.
+* Touch ID
+* macOS user password
 
-If this is the first launch, you may see the message:
+Authentication is cached briefly to avoid repeated prompts.
 
-“The application ‘Auto Fix’ can’t be opened because the developer cannot be verified.”
+## System Requirements
 
-How to open it:
+* macOS 12 or newer
+* Apple Silicon or Intel Mac
+* Camera access (optional, for QR scanning)
 
-Right-click (or hold Control and click) on AutoFix.app
+## Installation
 
-Select Open from the context menu
+1. Download the release archive.
+2. Extract the ZIP file.
+3. Move `GlassOTP.app` into your **Applications** folder.
 
-In the dialog window, click Open again to confirm
+## First Launch
 
-After opening AutoFix, select GlassOPT.app and run the fix.
+Because the application is not signed by an Apple developer certificate, macOS Gatekeeper may block it.
 
-What AutoFix Does
+To launch the application:
 
-AutoFix runs several system commands with sudo privileges to remove macOS security flags and fix permissions:
+1. Right-click on `GlassOTP.app`
+2. Select **Open**
+3. Click **Open** again in the dialog window
+
+After this, macOS will allow the application to run normally.
+
+## macOS Security Warning
+
+On newer macOS versions you may see a warning similar to:
+
+"The application is damaged and can’t be opened. You should move it to the Trash."
+
+This occurs because Gatekeeper adds security attributes to applications downloaded from the internet.
+
+You can remove these attributes manually or by using the included AutoFix utility.
+
+## AutoFix Utility
+
+The repository includes a helper tool named **AutoFix.app**.
+
+AutoFix removes macOS quarantine flags and corrects application permissions.
+
+### Using AutoFix
+
+1. Launch `AutoFix.app`
+2. If macOS blocks it, right-click and choose **Open**
+3. Select `GlassOTP.app`
+4. Run the fix
+
+### What AutoFix Does
+
+AutoFix executes the following commands with elevated privileges:
+
 ```
 xattr -c -r
 xattr -r -d
@@ -48,19 +97,90 @@ chmod -R 777
 
 These commands:
 
-Remove extended attributes added by macOS
+* Remove extended macOS quarantine attributes
+* Fix executable permissions
+* Ensure the application can launch properly
 
-Fix application permissions
+## Manual Fix
 
-Ensure the application can run properly
+If you prefer not to use AutoFix, you can run the command manually:
 
-After Fixing
-
-Once the process is complete, GlassOPT should launch normally without macOS blocking it.
-
-
-If you do not want to use AutoFix, you can simply run the following command:
 ```
-sudo xattr -r -c /Applications/LockedApp.app
+sudo xattr -r -c /Applications/GlassOTP.app
 ```
-Replace LockedApp.app with the name of the damaged application.
+
+## Usage
+
+Once launched, GlassOTP appears in the macOS menu bar.
+
+From the menu you can:
+
+* Add new tokens
+* Scan QR codes
+* Import `otpauth://` links
+* Copy authentication codes
+* Manage existing tokens
+
+Clicking a token copies the current code to the clipboard.
+
+## Token Management
+
+GlassOTP supports several ways to add tokens:
+
+### QR Code Import
+
+Drag a QR image into the import window or scan using your Mac camera.
+
+### otpauth Links
+
+Paste an `otpauth://` URL exported from another authenticator.
+
+### Manual Entry
+
+Manually enter:
+
+* Issuer
+* Account
+* Secret key (Base32)
+* Algorithm
+* Code length
+* Period
+
+## Editing Tokens
+
+Tokens can be renamed or edited.
+
+You may also:
+
+* View the secret key
+* Regenerate the QR code for another authenticator
+
+Both actions require system authentication.
+
+## Building from Source
+
+Requirements:
+
+* Xcode 14+
+* Swift 5.7+
+
+Clone the repository:
+
+```
+git clone https://github.com/Croakieee/GlassOTP.git
+```
+
+Open the project in Xcode and build normally.
+
+## Contributing
+
+Pull requests and improvements are welcome.
+
+If you discover a bug or have a feature request, please open an issue.
+
+## Disclaimer
+
+GlassOTP is an open source project provided without warranty.
+Use it at your own risk.
+
+For maximum security, always keep backup codes for your accounts.
