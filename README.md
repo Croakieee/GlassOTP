@@ -82,7 +82,7 @@ For the .pkg installation method use =>
 
 [![Use Sentinel](https://img.shields.io/badge/%20Use-Sentinel-2ea44f?style=for-the-badge&logo=github)](https://github.com/alienator88/Sentinel)
 
-AutoFix removes macOS quarantine flags and corrects application permissions.
+AutoFix and Sentinel removes macOS quarantine flags and corrects application permissions.
 
 ### Using AutoFix
 
