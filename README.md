@@ -78,7 +78,9 @@ The repository includes a helper tool named **AutoFix.app**.
 
 [![Thanks to Appstorrent](https://img.shields.io/badge/Thanks-Appstorrent-blue?style=flat-square)](https://appstorrent.ru/200-mistakes.html)
 
-[![Or Use Sentinel](https://img.shields.io/badge/Or%20Use-Sentinel-2ea44f?style=for-the-badge&logo=github)](https://github.com/alienator88/Sentinel)
+For the .pkg installation method use =>
+
+[![Use Sentinel](https://img.shields.io/badge/%20Use-Sentinel-2ea44f?style=for-the-badge&logo=github)](https://github.com/alienator88/Sentinel)
 
 AutoFix removes macOS quarantine flags and corrects application permissions.
 
