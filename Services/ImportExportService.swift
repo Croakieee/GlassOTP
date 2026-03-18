@@ -16,13 +16,13 @@ enum ImportError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidURL: return "Некорректная ссылка."
-        case .unsupportedType: return "Поддерживаются otpauth://totp/… и otpauth-migration://…"
-        case .missingSecret: return "Отсутствует параметр secret."
-        case .badBase32: return "Секрет не удалось декодировать (Base32)."
-        case .badDigits: return "Некорректное значение digits."
-        case .badPeriod: return "Некорректное значение period."
-        case .badAlgorithm: return "Некорректное значение algorithm."
+        case .invalidURL: return "Invalid link."
+        case .unsupportedType: return "Supported: otpauth://totp/… and otpauth-migration://…"
+        case .missingSecret: return "Missing secret parameter."
+        case .badBase32: return "Failed to decode the secret (Base32)."
+        case .badDigits: return "Invalid digits value."
+        case .badPeriod: return "Invalid period value."
+        case .badAlgorithm: return "Invalid algorithm value."
         }
     }
 }

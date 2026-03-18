@@ -105,9 +105,9 @@ struct RootPopoverView: View {
         .alert(isPresented: $showDeleteAlert) {
 
             Alert(
-                title: Text("Удалить токен?"),
-                message: Text("Действие нельзя отменить. Секрет будет удалён из связки ключей."),
-                primaryButton: .destructive(Text("Удалить")) {
+                title: Text("Delete token?"),
+                message: Text("This action cannot be undone. The secret will be removed from the keychain."),
+                primaryButton: .destructive(Text("Delete")) {
 
                     if let id = deleteTokenID {
                         store.remove(id)
@@ -151,7 +151,7 @@ struct RootPopoverView: View {
 
             }
             .buttonStyle(BorderlessButtonStyle())
-            .help("Добавить токен")
+            .help("Add token")
 
         }
     }
@@ -165,7 +165,7 @@ struct RootPopoverView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
 
-            TextField("Поиск по аккаунтам…", text: $store.query)
+            TextField("Search accounts…", text: $store.query)
                 .textFieldStyle(PlainTextFieldStyle())
                 .disableAutocorrection(true)
                 .font(.system(size: 13, weight: .regular, design: .rounded))
@@ -188,7 +188,7 @@ struct RootPopoverView: View {
             HStack {
 
                 Toggle(isOn: $autoCloseOnCopy) {
-                    Text("Закрывать после копирования")
+                    Text("Close after copying")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -201,7 +201,7 @@ struct RootPopoverView: View {
             HStack {
 
                 Toggle(isOn: $appState.pinPopover) {
-                    Text("Прикрепить поповер")
+                    Text("Pin popover")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -212,7 +212,7 @@ struct RootPopoverView: View {
                 Button(action: {
                     NSApplication.shared.terminate(nil)
                 }) {
-                    Text("Выход")
+                    Text("Exit")
                 }
 
             }
@@ -240,7 +240,7 @@ struct RootPopoverView: View {
         let context = LAContext()
         var error: NSError?
 
-        let reason = "Подтвердите доступ к защищённым данным OTP"
+        let reason = "Authenticate to access protected OTP data"
 
         if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
 

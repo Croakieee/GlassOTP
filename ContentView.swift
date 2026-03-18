@@ -19,4 +19,4 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
-// Not Used =)
+// Not Used =) i don't even know for what is it =)

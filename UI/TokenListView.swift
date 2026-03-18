@@ -21,10 +21,10 @@ struct TokenListView: View {
                 Image(systemName: "qrcode")
                     .font(.system(size: 44))
                     .foregroundColor(.secondary)
-                Text("Пока нет токенов")
+                Text("No tokens yet")
                     .font(.callout)
                     .foregroundColor(.secondary)
-                Text("Нажми “+” и добавь otpauth:// ссылку или импортируй QR.")
+                Text("Tap “+” and add an otpauth:// link or import a QR code.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -50,25 +50,25 @@ struct TokenListView: View {
                             }
                         }
                         .contextMenu {
-                            Button(token.isPinned ? "Открепить" : "Закрепить") {
+                            Button(token.isPinned ? "Unpin" : "Pin") {
                                 onPin(token.id)
                             }
 
-                            Button("Переименовать…") {
+                            Button("Rename…") {
                                 onRename(token.id)
                             }
                             
-                            Button("Показать QR-код") {
+                            Button("Show QR code") {
                                 onShowQR(token.id)
                             }
 
-                            Button("Показать / изменить секрет…") {
+                            Button("Show / edit secret…") {
                                 onEditSecret(token.id)
                             }
 
                             Divider()
 
-                            Button("Удалить") {
+                            Button("Delete") {
                                 onDelete(token.id)
                             }
                         }

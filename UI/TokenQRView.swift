@@ -15,7 +15,7 @@ struct TokenQRView: View {
 
         VStack(spacing: 16) {
 
-            Text("QR код токена")
+            Text("Token QR code")
                 .font(.title3)
 
             if let image = generateQR() {
@@ -31,7 +31,7 @@ struct TokenQRView: View {
                 .font(.footnote)
                 .foregroundColor(.secondary)
 
-            Button("Закрыть") {
+            Button("Close") {
                 onClose()
             }
 

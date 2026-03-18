@@ -20,11 +20,11 @@ struct RenameTokenSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Переименовать").font(.headline)
+            Text("Rename").font(.headline)
 
             VStack(alignment: .leading) {
                 Text("Issuer").font(.caption).foregroundColor(.secondary)
-                TextField("напр. Google", text: $issuer)
+                TextField("e.g. Google", text: $issuer)
                     .textFieldStyle(PlainTextFieldStyle())
                     .padding(6)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.06)))
@@ -32,7 +32,7 @@ struct RenameTokenSheet: View {
 
             VStack(alignment: .leading) {
                 Text("Account").font(.caption).foregroundColor(.secondary)
-                TextField("напр. you@example.com", text: $account)
+                TextField("e.g. you@example.com", text: $account)
                     .textFieldStyle(PlainTextFieldStyle())
                     .padding(6)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.black.opacity(0.06)))
@@ -40,8 +40,8 @@ struct RenameTokenSheet: View {
 
             HStack {
                 Spacer()
-                Button("Отмена") { presentation.wrappedValue.dismiss() }
-                Button("Сохранить") {
+                Button("Cancel") { presentation.wrappedValue.dismiss() }
+                Button("Save") {
                     onSave(issuer, account)
                     presentation.wrappedValue.dismiss()
                 }

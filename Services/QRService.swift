@@ -9,9 +9,9 @@ enum QRImportError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noQRFound: return "QR-код не найден на изображении."
-        case .noOtpauthInQR: return "В QR нет otpauth:// или otpauth-migration:// ссылки."
-        case .cannotReadImage: return "Не удалось прочитать изображение."
+        case .noQRFound: return "No QR code found in the image."
+        case .noOtpauthInQR: return "The QR code does not contain an otpauth:// or otpauth-migration:// link."
+        case .cannotReadImage: return "Failed to read the image."
         }
     }
 }

@@ -13,10 +13,10 @@ struct EditSecretView: View {
 
         VStack(alignment: .leading, spacing: 12) {
 
-            Text("Секрет токена")
+            Text("Token secret")
                 .font(.title3)
 
-            TextField("Base32 секрет", text: $secret)
+            TextField("Base32 Secret", text: $secret)
                 .font(.system(.body, design: .monospaced))
 
             if let errorMessage {
@@ -27,19 +27,19 @@ struct EditSecretView: View {
 
             HStack {
 
-                Button("Отмена") {
+                Button("Cancel") {
                     onClose()
                 }
 
                 Spacer()
 
-                Button("Сохранить") {
+                Button("Save") {
 
                     do {
                         try store.updateSecret(for: token, base32: secret)
                         onClose()
                     } catch {
-                        errorMessage = "Неверный Base32"
+                        errorMessage = "Invalid Base32"
                     }
 
                 }

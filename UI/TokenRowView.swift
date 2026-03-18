@@ -35,7 +35,7 @@ struct TokenRowView: View, Equatable {
                             .opacity(copied ? 0.35 : 1.0)
 
                         if copied {
-                            Label("Скопировано", systemImage: "checkmark.circle.fill")
+                            Label("Copied", systemImage: "checkmark.circle.fill")
                                 .labelStyle(.titleAndIcon)
                                 .foregroundColor(.green)
                                 .font(.system(size: 12, weight: .semibold))

@@ -29,19 +29,23 @@ struct KeychainService {
     static func setSecret(_ secret: Data, for id: UUID) throws {
         let account = key(for: id)
 
-        // Try update
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
+
         let attrs: [String: Any] = [
-            kSecValueData as String: secret
+            kSecValueData as String: secret,
+            //  лишние запросы пароля
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
+
         let status = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
         if status == errSecSuccess {
             return
         }
+
         if status != errSecItemNotFound {
             throw KeychainError.update(status)
         }
@@ -49,7 +53,10 @@ struct KeychainService {
         // Add
         var addQuery = query
         addQuery[kSecValueData as String] = secret
+
+        // параметры для хранения кейчена
         addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         if addStatus != errSecSuccess {
             throw KeychainError.add(addStatus)
@@ -58,6 +65,7 @@ struct KeychainService {
 
     static func getSecret(for id: UUID) throws -> Data {
         let account = key(for: id)
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -65,8 +73,11 @@ struct KeychainService {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
+
         var item: CFTypeRef?
+
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+
         if status == errSecSuccess {
             if let data = item as? Data { return data }
             throw KeychainError.copy(status)
@@ -79,15 +90,19 @@ struct KeychainService {
 
     static func deleteSecret(for id: UUID) throws {
         let account = key(for: id)
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
+
         let status = SecItemDelete(query as CFDictionary)
+
         if status == errSecSuccess || status == errSecItemNotFound {
             return
         }
+
         throw KeychainError.delete(status)
     }
 }

@@ -4,8 +4,8 @@ import AVFoundation
 import Vision
 
 enum AddMode: String, CaseIterable {
-    case otpauth = "Ссылка / QR"
-    case manual  = "Вручную"
+    case otpauth = "Link / QR"
+    case manual  = "Manually"
 }
 
 struct AddTokenSheet: View {
@@ -40,17 +40,17 @@ struct AddTokenSheet: View {
             HStack(spacing: 8) {
                 Image(systemName: "qrcode.viewfinder")
                     .foregroundColor(.accentColor)
-                Text("Добавить токен(ы)")
+                Text("Add token(s)")
                     .font(.title3).fontWeight(.semibold)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(BorderlessButtonStyle())
-                .help("Закрыть")
+                .help("Close")
             }
 
-            Picker("Режим", selection: $mode) {
+            Picker("Mode", selection: $mode) {
                 ForEach(AddMode.allCases, id: \.self) { m in
                     Text(m.rawValue).tag(m)
                 }
@@ -80,8 +80,8 @@ struct AddTokenSheet: View {
 
             HStack {
                 Spacer()
-                Button("Отмена") { onClose() }
-                Button("Добавить") { addAction() }
+                Button("Cancel") { onClose() }
+                Button("Add") { addAction() }
                     .keyboardShortcut(.return)
                     .disabled(!canSubmit)
             }
@@ -92,9 +92,9 @@ struct AddTokenSheet: View {
         .sheet(isPresented: $showCameraScanner, onDismiss: { cameraRunning = false }) {
             VStack {
                 HStack {
-                    Text("Сканировать QR").font(.headline)
+                    Text("Scan QR code").font(.headline)
                     Spacer()
-                    Button("Закрыть") { showCameraScanner = false }
+                    Button("Close") { showCameraScanner = false }
                 }
                 .padding([.top, .horizontal])
                 Divider()
@@ -120,7 +120,7 @@ struct AddTokenSheet: View {
 
     private var otpauthBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Вставьте ссылку **otpauth://…** или **otpauth-migration://…** (экспорт Google Authenticator). Либо перетащите сюда изображение/скриншот с QR-кодом.")
+            Text("Paste an otpauth://… or otpauth-migration://… link (Google Authenticator export). Or drag and drop an image/screenshot with a QR code here.")
                 .font(.footnote)
                 .foregroundColor(.secondary)
 
@@ -135,17 +135,17 @@ struct AddTokenSheet: View {
 
             HStack(spacing: 8) {
                 Button(action: importFromImageFile) {
-                    Label("Выбрать изображение…", systemImage: "folder")
+                    Label("Select image…", systemImage: "folder")
                 }
                 Button(action: importFromClipboard) {
-                    Label("Вставить из буфера", systemImage: "doc.on.clipboard")
+                    Label("Paste from clipboard", systemImage: "doc.on.clipboard")
                 }
                 Button(action: { startCameraScanner() }) {
-                    Label("Сканировать с камеры", systemImage: "camera")
+                    Label("Scan with camera", systemImage: "camera")
                 }
                 Spacer()
                 Button(action: pasteFromClipboardIfText) {
-                    Label("Вставить ссылку", systemImage: "link")
+                    Label("Paste link", systemImage: "link")
                 }
             }
         }
@@ -161,7 +161,7 @@ struct AddTokenSheet: View {
 
             VStack(spacing: 6) {
                 Image(systemName: "tray.and.arrow.down")
-                Text("Перетащите сюда изображение с QR")
+                Text("Drag and drop an image with a QR code here")
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
@@ -225,7 +225,7 @@ struct AddTokenSheet: View {
                     Text("Issuer").font(.caption).foregroundColor(.secondary)
                     HStack {
                         Image(systemName: "building.columns").foregroundColor(.secondary)
-                        TextField("напр. Google", text: $issuer)
+                        TextField("e.g., Google", text: $issuer)
                             .textFieldStyle(PlainTextFieldStyle())
                     }
                     .padding(8)
@@ -235,7 +235,7 @@ struct AddTokenSheet: View {
                     Text("Account").font(.caption).foregroundColor(.secondary)
                     HStack {
                         Image(systemName: "at").foregroundColor(.secondary)
-                        TextField("напр. you@example.com", text: $account)
+                        TextField("e.g., you@example.com", text: $account)
                             .textFieldStyle(PlainTextFieldStyle())
                     }
                     .padding(8)
@@ -247,7 +247,7 @@ struct AddTokenSheet: View {
                 Text("Secret (Base32)").font(.caption).foregroundColor(.secondary)
                 HStack {
                     Image(systemName: "key").foregroundColor(.secondary)
-                    TextField("например JBSWY3DPEHPK3PXP", text: $secretBase32)
+                    TextField("e.g., JBSWY3DPEHPK3PXP", text: $secretBase32)
                         .textFieldStyle(PlainTextFieldStyle())
                         .font(.system(.body, design: .monospaced))
                 }
@@ -258,15 +258,15 @@ struct AddTokenSheet: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Digits").font(.caption).foregroundColor(.secondary)
-                    TextField("6 или 8", text: $digits)
+                    TextField("6 or 8", text: $digits)
                         .textFieldStyle(PlainTextFieldStyle())
                         .frame(width: 80)
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Period (сек.)").font(.caption).foregroundColor(.secondary)
-                    TextField("обычно 30", text: $period)
+                    Text("Period (sec.)").font(.caption).foregroundColor(.secondary)
+                    TextField("Typically 30", text: $period)
                         .textFieldStyle(PlainTextFieldStyle())
                         .frame(width: 100)
                         .padding(8)
@@ -301,7 +301,7 @@ struct AddTokenSheet: View {
             onAddMany(list)
 
             // показываем краткий success и очищаем поля, оставляя окно открытым
-            withAnimation { addedMessage = "Добавлено \(list.count) токен(ов)" }
+            withAnimation { addedMessage = "Added \(list.count) token(s)" }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
             clearAllFields()
         } catch {
@@ -355,7 +355,7 @@ struct AddTokenSheet: View {
         } else if let str = pb.string(forType: .string), str.lowercased().hasPrefix("otpauth") {
             self.otpauthText = str
         } else {
-            self.errorMessage = "В буфере нет изображения с QR или otpauth/otpauth-migration ссылки."
+            self.errorMessage = "No QR image or otpauth/otpauth-migration link found in the clipboard."
         }
     }
 
@@ -398,12 +398,12 @@ struct AddTokenSheet: View {
                         self.showCameraScanner = true
                         self.cameraRunning = true
                     } else {
-                        self.errorMessage = "Доступ к камере запрещён."
+                        self.errorMessage = "Camera access is denied."
                     }
                 }
             }
         default:
-            errorMessage = "Доступ к камере запрещён. Разрешите в System Settings → Security & Privacy."
+            errorMessage = "Camera access is denied. Allow it in System Settings → Security & Privacy."
         }
     }
 }
