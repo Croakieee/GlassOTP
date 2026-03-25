@@ -7,6 +7,9 @@ import Vision
 // NSViewRepresentable
 struct QRCameraScannerView: NSViewRepresentable {
     typealias NSViewType = CameraPreviewView
+    
+    // observer на смену камеры
+    var currentDeviceID: String?
 
     var onFound: (String) -> Void
     @Binding var isRunning: Bool
@@ -19,15 +22,18 @@ struct QRCameraScannerView: NSViewRepresentable {
         view.coordinator = context.coordinator
 
         // передаём выбранную камеру
-        view.selectedDeviceID = selectedDeviceID
+        // view.selectedDeviceID = selectedDeviceID
 
         return view
     }
 
     func updateNSView(_ nsView: CameraPreviewView, context: Context) {
         DispatchQueue.main.async {
-            nsView.selectedDeviceID = selectedDeviceID
-
+            if nsView.currentDeviceID != selectedDeviceID {
+                nsView.currentDeviceID = selectedDeviceID
+                nsView.restartSession() // рестар после выбора камеры
+            }
+            
             if isRunning {
                 nsView.startSessionIfNeeded()
             } else {
@@ -86,9 +92,17 @@ final class CameraPreviewView: NSView {
     var previewLayer: AVCaptureVideoPreviewLayer?
 
     var coordinator: QRCameraScannerView.Coordinator?
+    
+    var currentDeviceID: String?
+    
+    // restart session для подхвата смены камеры
+    func restartSession() {
+        stopSession()
+        startSessionIfNeeded()
+    }
 
     // чпоньк =)
-    var selectedDeviceID: String?
+    // var selectedDeviceID: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -126,7 +140,7 @@ final class CameraPreviewView: NSView {
         // выбор камеры
         let device: AVCaptureDevice?
 
-        if let id = selectedDeviceID {
+        if let id = currentDeviceID {
             device = AVCaptureDevice.devices(for: .video).first { $0.uniqueID == id }
         } else {
             device = AVCaptureDevice.default(for: .video)
