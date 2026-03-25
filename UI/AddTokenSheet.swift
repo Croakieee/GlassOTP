@@ -16,6 +16,10 @@ struct AddTokenSheet: View {
 
     // otpauth / migration
     @State private var otpauthText: String = ""
+    
+    // camera devices
+    @State private var availableCameras: [AVCaptureDevice] = AVCaptureDevice.devices(for: .video)
+    @State private var selectedCameraID: String? = AVCaptureDevice.devices(for: .video).first?.uniqueID
 
     // manual
     @State private var issuer: String = ""
@@ -96,6 +100,13 @@ struct AddTokenSheet: View {
                     Spacer()
                     Button("Close") { showCameraScanner = false }
                 }
+                // меню выбора камеры
+                Picker("Camera", selection: $selectedCameraID) {
+                    ForEach(availableCameras, id: \.uniqueID) { device in
+                        Text(device.localizedName).tag(Optional(device.uniqueID))
+                    }
+                }
+                .padding(.horizontal)
                 .padding([.top, .horizontal])
                 Divider()
                 QRCameraScannerView(onFound: { found in
@@ -103,7 +114,7 @@ struct AddTokenSheet: View {
                         self.otpauthText = found
                         self.showCameraScanner = false
                     }
-                }, isRunning: $cameraRunning)
+                }, isRunning: $cameraRunning, selectedDeviceID: $selectedCameraID )
                     .frame(minHeight: 360)
                     .padding()
                 Spacer()

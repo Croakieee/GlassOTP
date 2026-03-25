@@ -4,22 +4,30 @@ import AppKit
 import SwiftUI
 import Vision
 
-// NSViewRepresentable — без изменений
+// NSViewRepresentable
 struct QRCameraScannerView: NSViewRepresentable {
     typealias NSViewType = CameraPreviewView
+
     var onFound: (String) -> Void
     @Binding var isRunning: Bool
 
+    // чпоньк
+    @Binding var selectedDeviceID: String?
+
     func makeNSView(context: Context) -> CameraPreviewView {
         let view = CameraPreviewView()
-        // Сохраняем координатор СИЛЬНО внутри view, чтобы он не освобождался
         view.coordinator = context.coordinator
+
+        // передаём выбранную камеру
+        view.selectedDeviceID = selectedDeviceID
+
         return view
     }
 
     func updateNSView(_ nsView: CameraPreviewView, context: Context) {
-        // run on main thread to be safe
         DispatchQueue.main.async {
+            nsView.selectedDeviceID = selectedDeviceID
+
             if isRunning {
                 nsView.startSessionIfNeeded()
             } else {
@@ -41,7 +49,6 @@ struct QRCameraScannerView: NSViewRepresentable {
             super.init()
         }
 
-        // receive sampleBuffer from view
         func handleSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
             detectQueue.async {
                 guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
@@ -61,21 +68,27 @@ struct QRCameraScannerView: NSViewRepresentable {
                         }
                     }
                 }
+
                 request.symbologies = [.QR]
+
                 let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
-                do { try handler.perform([request]) } catch { /* ignore */ }
+                do { try handler.perform([request]) } catch { }
             }
         }
     }
 }
 
 
-/// NSView + preview layer. Хранит координатор сильной ссылкой `coordinator`.
+/// NSView + preview layer
 final class CameraPreviewView: NSView {
+
     var captureSession: AVCaptureSession?
     var previewLayer: AVCaptureVideoPreviewLayer?
-    // strong reference to coordinator to avoid premature deallocation
+
     var coordinator: QRCameraScannerView.Coordinator?
+
+    // чпоньк =)
+    var selectedDeviceID: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -98,11 +111,11 @@ final class CameraPreviewView: NSView {
     }
 
     private func _startSession() {
-        guard captureSession == nil else { return } // уже запущена
+        guard captureSession == nil else { return }
 
-        // проверяем разрешение
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .denied || status == .restricted { return }
+
         if status == .notDetermined {
             AVCaptureDevice.requestAccess(for: .video) { _ in }
         }
@@ -110,22 +123,37 @@ final class CameraPreviewView: NSView {
         let session = AVCaptureSession()
         session.sessionPreset = .high
 
-        guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device),
+        // выбор камеры
+        let device: AVCaptureDevice?
+
+        if let id = selectedDeviceID {
+            device = AVCaptureDevice.devices(for: .video).first { $0.uniqueID == id }
+        } else {
+            device = AVCaptureDevice.default(for: .video)
+        }
+
+        guard let camera = device,
+              let input = try? AVCaptureDeviceInput(device: camera),
               session.canAddInput(input)
         else { return }
+
         session.addInput(input)
 
         let previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.videoGravity = .resizeAspectFill
         previewLayer.frame = bounds
+
         layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
         layer?.addSublayer(previewLayer)
+
         self.previewLayer = previewLayer
 
         let dataOutput = AVCaptureVideoDataOutput()
         dataOutput.alwaysDiscardsLateVideoFrames = true
-        dataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        dataOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
+
         let queue = DispatchQueue(label: "glassotp.camera.queue")
         dataOutput.setSampleBufferDelegate(self, queue: queue)
 
@@ -134,9 +162,9 @@ final class CameraPreviewView: NSView {
             self.previewLayer = nil
             return
         }
+
         session.addOutput(dataOutput)
 
-        // если есть подключение — выставляем ориентацию (best effort)
         if let conn = dataOutput.connection(with: .video), conn.isVideoOrientationSupported {
             conn.videoOrientation = .portrait
         }
@@ -144,7 +172,12 @@ final class CameraPreviewView: NSView {
         self.captureSession = session
 
         postsFrameChangedNotifications = true
-        NotificationCenter.default.addObserver(self, selector: #selector(frameChanged), name: NSView.frameDidChangeNotification, object: self)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(frameChanged),
+            name: NSView.frameDidChangeNotification,
+            object: self
+        )
 
         session.startRunning()
     }
@@ -155,9 +188,13 @@ final class CameraPreviewView: NSView {
 
     func stopSession() {
         NotificationCenter.default.removeObserver(self)
+
         if let session = captureSession {
-            if session.isRunning { session.stopRunning() }
+            if session.isRunning {
+                session.stopRunning()
+            }
         }
+
         captureSession = nil
         previewLayer?.removeFromSuperlayer()
         previewLayer = nil
@@ -168,7 +205,7 @@ extension CameraPreviewView: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        // forward sampleBuffer to strong coordinator if available
+
         coordinator?.handleSampleBuffer(sampleBuffer)
     }
 }
