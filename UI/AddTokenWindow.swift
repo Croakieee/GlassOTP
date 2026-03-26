@@ -32,7 +32,7 @@ final class AddTokenWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        win.title = "Добавить токены"
+        win.title = "Add Token(s)"
         win.contentViewController = host
         win.isReleasedWhenClosed = false
 
