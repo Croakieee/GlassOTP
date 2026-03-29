@@ -432,6 +432,7 @@ struct AddTokenSheet: View {
     // MARK: - Backup
 
     private func exportTokens() {
+        errorMessage = nil
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "backup.glassotp"
 
@@ -440,7 +441,7 @@ struct AddTokenSheet: View {
 
             askPassword { password in
                 do {
-                    let store = OTPStore.sampleStore() // если есть доступ к реальному store — лучше заменить
+                    let store = OTPStore.sampleStore() // сделать доступ к реальному store — ( лучше заменить лажово )
                     let data = try BackupService.export(
                         tokens: store.tokens,
                         store: store,
@@ -455,6 +456,7 @@ struct AddTokenSheet: View {
     }
 
     private func importTokens() {
+        errorMessage = nil
         let panel = NSOpenPanel()
         panel.allowedFileTypes = ["glassotp"]
 
@@ -468,6 +470,12 @@ struct AddTokenSheet: View {
                     onAddMany(tokens)
                 } catch {
                     self.errorMessage = "Wrong password or corrupted file"
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation {
+                            self.errorMessage = nil
+                        }
+                    }
                 }
             }
         }
