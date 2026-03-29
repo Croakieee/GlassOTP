@@ -38,9 +38,14 @@ require authentication via:
 
 Authentication is cached briefly to avoid repeated prompts.
 
+GlassOTP does not transmit, sync, or upload your secrets.
+
+The application does not use any network connections and operates fully offline.
+All data remains stored locally on your device.
+
 ## System Requirements
 
-* macOS 12 or newer
+* macOS 11.7 or newer
 * Apple Silicon or Intel Mac
 * Camera access (optional, for QR scanning)
 
@@ -56,7 +61,7 @@ Because the application is not signed by an Apple developer certificate, macOS G
 
 To launch the application:
 
-1. Right-click on `GlassOTP.app`
+1. Hold "Control" and right-click on `GlassOTP.app`
 2. Select **Open**
 3. Click **Open** again in the dialog window
 
@@ -68,9 +73,27 @@ On newer macOS versions you may see a warning similar to:
 
 "The application is damaged and can’t be opened. You should move it to the Trash."
 
-This occurs because Gatekeeper adds security attributes to applications downloaded from the internet.
+This can happen for two different reasons depending on the protection mechanism:
 
-You can remove these attributes manually or by using the included AutoFix utility.
+* **Gatekeeper quarantine attributes** applied to files downloaded from the internet
+* **System integrity checks** detecting potential modification or unverified content
+
+### Sentinel
+
+`Sentinel` helps remove macOS quarantine attributes that prevent the application from launching.
+
+Use it if the app is blocked immediately after download.
+
+### AutoFix
+
+`AutoFix` resolves issues when macOS flags the application as damaged or unsafe.
+
+This typically occurs when the system believes the app has been modified or contains suspicious content.
+
+Use AutoFix if you see a prompt suggesting to move the application to Trash.
+
+After applying the appropriate fix, the application should launch without warnings.
+
 
 ## AutoFix Utility
 
@@ -82,7 +105,9 @@ For the first installation likely you need to unlock AutoFix through =>
 
 [![Use Sentinel](https://img.shields.io/badge/%20Use-Sentinel-2ea44f?style=for-the-badge&logo=github)](https://github.com/alienator88/Sentinel)
 
-AutoFix and Sentinel removes macOS quarantine flags and corrects application permissions.
+Sentinel removes macOS quarantine attributes (`com.apple.quarantine`) that are applied to files downloaded from the internet.
+
+AutoFix addresses cases where macOS flags the application as damaged by fixing permissions and removing problematic attributes.
 
 ### Using AutoFix
 
