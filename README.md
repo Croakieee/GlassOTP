@@ -132,8 +132,6 @@ From the menu you can:
 * Manage existing tokens
 * Create backup file of OTP keys or import already made file
 
-Clicking a token copies the current code to the clipboard.
-
 ## Token Management
 
 GlassOTP supports several ways to add tokens:
