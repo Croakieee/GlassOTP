@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import AVFoundation
 import Vision
+import CryptoKit
 
 enum AddMode: String, CaseIterable {
     case otpauth = "Link / QR"
@@ -83,8 +84,18 @@ struct AddTokenSheet: View {
             }
 
             HStack {
+                Button("Export") {
+                    exportTokens()
+                }
+
+                Button("Import") {
+                    importTokens()
+                }
+
                 Spacer()
+
                 Button("Cancel") { onClose() }
+
                 Button("Add") { addAction() }
                     .keyboardShortcut(.return)
                     .disabled(!canSubmit)
@@ -415,6 +426,65 @@ struct AddTokenSheet: View {
             }
         default:
             errorMessage = "Camera access is denied. Allow it in System Settings → Security & Privacy."
+        }
+    }
+    
+    // MARK: - Backup
+
+    private func exportTokens() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "backup.glassotp"
+
+        panel.begin { resp in
+            guard resp == .OK, let url = panel.url else { return }
+
+            askPassword { password in
+                do {
+                    let store = OTPStore.sampleStore() // если есть доступ к реальному store — лучше заменить
+                    let data = try BackupService.export(
+                        tokens: store.tokens,
+                        store: store,
+                        password: password
+                    )
+                    try data.write(to: url)
+                } catch {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func importTokens() {
+        let panel = NSOpenPanel()
+        panel.allowedFileTypes = ["glassotp"]
+
+        panel.begin { resp in
+            guard resp == .OK, let url = panel.url else { return }
+
+            askPassword { password in
+                do {
+                    let data = try Data(contentsOf: url)
+                    let tokens = try BackupService.import(data: data, password: password)
+                    onAddMany(tokens)
+                } catch {
+                    self.errorMessage = "Wrong password or corrupted file"
+                }
+            }
+        }
+    }
+
+    private func askPassword(completion: @escaping (String) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Enter password for backup file"
+
+        let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        alert.accessoryView = input
+
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            completion(input.stringValue)
         }
     }
 }
