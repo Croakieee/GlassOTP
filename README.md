@@ -149,7 +149,7 @@ Paste an `otpauth://` URL exported from another authenticator.
 
 Manually enter:
 
-![3 UI](screenshots/31.png)
+![3 UI](screenshots/311.png)
 
 * Issuer
 * Account
