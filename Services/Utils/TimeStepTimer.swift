@@ -26,4 +26,15 @@ final class TimeStepTimer: ObservableObject {
         timer?.invalidate()
         timer = nil
     }
+    
+    func resume() {
+        if timer == nil {
+            start()
+        }
+    }
+
+    func pause() {
+        stop()
+    }
+    
 }

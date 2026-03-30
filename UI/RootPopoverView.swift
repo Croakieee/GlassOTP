@@ -62,6 +62,10 @@ struct RootPopoverView: View {
             .padding(16)
         }
         .background(Color.clear)
+//новый блок
+        .onAppear {
+            NotificationCenter.default.post(name: .storeReady, object: store)
+        }
 
         .sheet(item: $renameHandle, onDismiss: {
             renameIssuer = ""
