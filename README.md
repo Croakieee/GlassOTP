@@ -80,13 +80,13 @@ This can happen for two different reasons depending on the protection mechanism:
 
 ### Sentinel
 
-`Sentinel` helps remove macOS quarantine attributes that prevent the application from launching.
+`Sentinel` helps remove macOS quarantine attributes that prevent the application from launching. ( For MacOS from 13.x.x )
 
 Use it if the app is blocked immediately after download.
 
 ### AutoFix
 
-`AutoFix` resolves issues when macOS flags the application as damaged or unsafe.
+`AutoFix` resolves issues when macOS flags the application as damaged or unsafe. ( Works with MacOS under 13.x.x without Sentinel patching )
 
 This typically occurs when the system believes the app has been modified or contains suspicious content.
 
