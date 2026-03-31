@@ -152,4 +152,28 @@ final class OTPStore: ObservableObject {
 
         objectWillChange.send()
     }
+    
+    // MARK: - Bulk
+
+    func removeAllTokens() {
+        for t in tokens {
+            try? KeychainService.deleteSecret(for: t.id)
+        }
+        tokens.removeAll()
+        secretCache.removeAll()
+        commit()
+    }
+
+    func isDuplicate(_ token: OTPToken, secret: Data) -> Bool {
+        for existing in tokens {
+            if existing.issuer == token.issuer &&
+               existing.account == token.account,
+               let existingSecret = try? KeychainService.getSecret(for: existing.id),
+               existingSecret == secret {
+                return true
+            }
+        }
+        return false
+    }
+    
 }

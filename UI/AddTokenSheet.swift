@@ -17,6 +17,8 @@ struct AddTokenSheet: View {
 
     // otpauth / migration
     @State private var otpauthText: String = ""
+    // import / export func
+    @State private var deleteAfterExport: Bool = false
     
     // camera devices
     @State private var availableCameras: [AVCaptureDevice] = AVCaptureDevice.devices(for: .video)
@@ -84,6 +86,7 @@ struct AddTokenSheet: View {
             }
 
             HStack {
+
                 Button("Export") {
                     exportTokens()
                 }
@@ -91,6 +94,9 @@ struct AddTokenSheet: View {
                 Button("Import") {
                     importTokens()
                 }
+
+                Toggle("Delete after export", isOn: $deleteAfterExport)
+                    .font(.caption)
 
                 Spacer()
 
@@ -433,6 +439,7 @@ struct AddTokenSheet: View {
 
     private func exportTokens() {
         errorMessage = nil
+
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "backup.glassotp"
 
@@ -441,15 +448,34 @@ struct AddTokenSheet: View {
 
             askPassword { password in
                 do {
-                    let store = OTPStore.sampleStore() // сделать доступ к реальному store — ( лучше заменить лажово )
+                    let store = OTPStore.sampleStore()
+
                     let data = try BackupService.export(
                         tokens: store.tokens,
                         store: store,
                         password: password
                     )
+
                     try data.write(to: url)
+
+                    withAnimation {
+                        addedMessage = "Exported \(store.tokens.count) tokens"
+                    }
+
+                    if deleteAfterExport {
+                        store.removeAllTokens()
+
+                        withAnimation {
+                            addedMessage = "Exported + cleared all tokens"
+                        }
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        addedMessage = nil
+                    }
+
                 } catch {
-                    self.errorMessage = error.localizedDescription
+                    errorMessage = error.localizedDescription
                 }
             }
         }
@@ -457,6 +483,7 @@ struct AddTokenSheet: View {
 
     private func importTokens() {
         errorMessage = nil
+
         let panel = NSOpenPanel()
         panel.allowedFileTypes = ["glassotp"]
 
@@ -466,8 +493,22 @@ struct AddTokenSheet: View {
             askPassword { password in
                 do {
                     let data = try Data(contentsOf: url)
-                    let tokens = try BackupService.import(data: data, password: password)
-                    onAddMany(tokens)
+                    let imported = try BackupService.import(data: data, password: password)
+
+                    let store = OTPStore.sampleStore()
+
+                    let result = ImportExportService.filterDuplicates(imported, store: store)
+
+                    onAddMany(result.added)
+
+                    withAnimation {
+                        addedMessage = "Imported: \(result.added.count), skipped: \(result.skipped)"
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        addedMessage = nil
+                    }
+
                 } catch {
                     self.errorMessage = "Wrong password or corrupted file"
 

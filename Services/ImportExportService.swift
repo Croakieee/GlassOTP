@@ -159,4 +159,23 @@ struct ImportExportService {
         if result.isEmpty { throw ImportError.unsupportedType }
         return result
     }
+    
+    // MARK: - Dedup
+
+    static func filterDuplicates(_ list: [ImportedToken], store: OTPStore) -> (added: [ImportedToken], skipped: Int) {
+
+        var added: [ImportedToken] = []
+        var skipped = 0
+
+        for item in list {
+            if store.isDuplicate(item.token, secret: item.secret) {
+                skipped += 1
+            } else {
+                added.append(item)
+            }
+        }
+
+        return (added, skipped)
+    }
+    
 }
