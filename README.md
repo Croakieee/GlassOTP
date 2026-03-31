@@ -148,7 +148,7 @@ Once launched, GlassOTP appears in the macOS menu bar.
 Then tap + on top left corner.
 From the menu you can:
 
-![2 UI](screenshots/211.png)
+![2 UI](screenshots/2111.png)
 
 * Add new tokens
 * Scan QR codes
