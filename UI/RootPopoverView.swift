@@ -145,7 +145,7 @@ struct RootPopoverView: View {
 
             Button(action: {
 
-                AddTokenWindowController.shared.show { list in
+                AddTokenWindowController.shared.show(store: store) { list in
                     store.addImportedMany(list)
                 }
 

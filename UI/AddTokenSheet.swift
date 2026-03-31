@@ -20,6 +20,16 @@ struct AddTokenSheet: View {
     
     // export func delete tokens after
     @State private var showDeleteConfirm: Bool = false
+    let store: OTPStore
+    
+    init(store: OTPStore,
+         onAddMany: @escaping ([ImportedToken]) -> Void,
+         onClose: @escaping () -> Void) {
+        
+        self.store = store
+        self.onAddMany = onAddMany
+        self.onClose = onClose
+    }
     
     // camera devices
     @State private var availableCameras: [AVCaptureDevice] = AVCaptureDevice.devices(for: .video)
@@ -154,7 +164,7 @@ struct AddTokenSheet: View {
                 message: Text("This will remove ALL tokens permanently."),
                 primaryButton: .destructive(Text("Delete")) {
 
-                    let store = OTPStore.sampleStore()
+                    let store = store
                     store.removeAllTokens()
 
                     withAnimation {
@@ -473,7 +483,7 @@ struct AddTokenSheet: View {
 
             askPassword { password in
                 do {
-                    let store = OTPStore.sampleStore()
+                    let store = store
 
                     let data = try BackupService.export(
                         tokens: store.tokens,
@@ -531,7 +541,7 @@ struct AddTokenSheet: View {
                     let data = try Data(contentsOf: url)
                     let imported = try BackupService.import(data: data, password: password)
 
-                    let store = OTPStore.sampleStore()
+                    let store = store
 
                     let result = ImportExportService.filterDuplicates(imported, store: store)
 
