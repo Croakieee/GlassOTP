@@ -3,9 +3,7 @@
 ## Features
 
 * Separate Import and Export buttons in the UI
-* Add a "Delete All" button for tokens
 * Remove redundant UI elements (e.g. duplicate close button in Add Token window)
-* Add a log message for successful backup import
 * Implement internal automatic backup:
 
   * Store backups in a fixed absolute path
@@ -28,7 +26,3 @@
   * Repeated password prompts requesting access to write to the keychain
   * Work in progress
 
-* Token refresh delay:
-
-  * Minor delays after system wake from sleep
-  * Needs optimization
