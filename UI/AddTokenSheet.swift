@@ -17,8 +17,9 @@ struct AddTokenSheet: View {
 
     // otpauth / migration
     @State private var otpauthText: String = ""
-    // import / export func
-    @State private var deleteAfterExport: Bool = false
+    
+    // export func delete tokens after
+    @State private var showDeleteConfirm: Bool = false
     
     // camera devices
     @State private var availableCameras: [AVCaptureDevice] = AVCaptureDevice.devices(for: .video)
@@ -95,8 +96,9 @@ struct AddTokenSheet: View {
                     importTokens()
                 }
 
-                Toggle("Delete after export", isOn: $deleteAfterExport)
-                    .font(.caption)
+                Button("Delete All") {
+                    showDeleteConfirm = true
+                }
 
                 Spacer()
 
@@ -106,6 +108,7 @@ struct AddTokenSheet: View {
                     .keyboardShortcut(.return)
                     .disabled(!canSubmit)
             }
+
             .padding(.top, 2)
         }
         .padding(18)
@@ -143,6 +146,28 @@ struct AddTokenSheet: View {
                 }
             }
             .onDisappear { cameraRunning = false }
+        }
+        
+        .alert(isPresented: $showDeleteConfirm) {
+            Alert(
+                title: Text("Delete all tokens?"),
+                message: Text("This will remove ALL tokens permanently."),
+                primaryButton: .destructive(Text("Delete")) {
+
+                    let store = OTPStore.sampleStore()
+                    store.removeAllTokens()
+
+                    withAnimation {
+                        addedMessage = "All tokens deleted"
+                    }
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        addedMessage = nil
+                    }
+
+                },
+                secondaryButton: .cancel()
+            )
         }
     }
 
@@ -458,20 +483,31 @@ struct AddTokenSheet: View {
 
                     try data.write(to: url)
 
-                    withAnimation {
-                        addedMessage = "Exported \(store.tokens.count) tokens"
-                    }
+                    DispatchQueue.main.async {
 
-                    if deleteAfterExport {
-                        store.removeAllTokens()
+                        let alert = NSAlert()
+                        alert.messageText = "Export successful"
+                        alert.informativeText = "Do you want to delete all tokens from this device?"
+                        alert.addButton(withTitle: "Delete All")
+                        alert.addButton(withTitle: "Keep")
 
-                        withAnimation {
-                            addedMessage = "Exported + cleared all tokens"
+                        let response = alert.runModal()
+
+                        if response == .alertFirstButtonReturn {
+                            store.removeAllTokens()
+
+                            withAnimation {
+                                addedMessage = "Exported + deleted all tokens"
+                            }
+                        } else {
+                            withAnimation {
+                                addedMessage = "Exported \(store.tokens.count) tokens"
+                            }
                         }
-                    }
 
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        addedMessage = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            addedMessage = nil
+                        }
                     }
 
                 } catch {
