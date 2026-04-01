@@ -66,6 +66,7 @@ struct AddTokenSheet: View {
                // }
                // .buttonStyle(BorderlessButtonStyle())
                // .help("Close")
+                // remove extra button
             }
 
             Picker("Mode", selection: $mode) {
