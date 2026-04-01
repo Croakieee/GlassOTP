@@ -61,11 +61,11 @@ struct AddTokenSheet: View {
                 Text("Add token(s)")
                     .font(.title3).fontWeight(.semibold)
                 Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                }
-                .buttonStyle(BorderlessButtonStyle())
-                .help("Close")
+               // Button(action: onClose) {
+                 //   Image(systemName: "xmark.circle.fill")
+               // }
+               // .buttonStyle(BorderlessButtonStyle())
+               // .help("Close")
             }
 
             Picker("Mode", selection: $mode) {
