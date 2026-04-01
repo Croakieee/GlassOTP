@@ -10,17 +10,11 @@
 
 ## Known Issues
 
-* Thread priority issue:
-
-  * File: `UI/AddTokenSheet.swift:486`
-  * Description: A thread running at User-interactive QoS is waiting on a lower QoS thread (Default)
-  * Status: Investigation ongoing to prevent priority inversion
-
 * Minor UI issue:
 
   * Timer slider may shift out of position
   * Minor delays in token refresh after the system wakes from sleep
-  * When switching between cameras, the pop-up close button may disappear
+  * Sometimes when switching between cameras, the pop-up close button may disappear
 
 * Update process issues:
 
