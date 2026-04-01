@@ -3,7 +3,6 @@
 ## Features
 
 * Separate Import, Export and Delete buttons in the UI
-* Remove redundant UI elements (e.g. duplicate close button in Add Token window)
 * Implement internal automatic backup:
 
   * Store backups in a fixed absolute path
