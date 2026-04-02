@@ -55,9 +55,10 @@ struct RootPopoverView: View {
                     onDelete: { id in beginDelete(id) },
                     onShowQR: { id in beginShowQR(id) }
                 )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                footer
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                
+              //  footer
+                Spacer(minLength: 0)
             }
             .padding(16)
         }
@@ -185,45 +186,45 @@ struct RootPopoverView: View {
 
     // MARK: Footer
 
-    private var footer: some View {
+   // private var footer: some View {
 
-        VStack(spacing: 8) {
+   //     VStack(spacing: 8) {
 
-            HStack {
+    //        HStack {
 
-                Toggle(isOn: $autoCloseOnCopy) {
-                    Text("Close after copying")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                .toggleStyle(SwitchToggleStyle())
+     //           Toggle(isOn: $autoCloseOnCopy) {
+      //              Text("Close after copying")
+      //                  .font(.footnote)
+       //                 .foregroundColor(.secondary)
+       //         }
+       //         .toggleStyle(SwitchToggleStyle())
 
-                Spacer()
+        //        Spacer()
 
-            }
+        //    }
 
-            HStack {
+         //   HStack {
 
-                Toggle(isOn: $appState.pinPopover) {
-                    Text("Pin popover")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                }
-                .toggleStyle(SwitchToggleStyle())
+         //       Toggle(isOn: $appState.pinPopover) {
+         //           Text("Pin popover")
+         //               .font(.footnote)
+          //              .foregroundColor(.secondary)
+          //      }
+          //      .toggleStyle(SwitchToggleStyle())
 
-                Spacer()
+          //      Spacer()
 
-                Button(action: {
-                    NSApplication.shared.terminate(nil)
-                }) {
-                    Text("Exit")
-                }
+           //     Button(action: {
+            //        NSApplication.shared.terminate(nil)
+            //    }) {
+            //        Text("Exit")
+        //        }
+//
+       //     }
 
-            }
-
-        }
-        .padding(.top, 4)
-    }
+    //    }
+//         .padding(.top, 4)
+//    }
 
     // MARK: Auth helpers
 

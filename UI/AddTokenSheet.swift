@@ -99,21 +99,21 @@ struct AddTokenSheet: View {
 
             HStack {
 
-                Button("Export") {
-                    exportTokens()
-                }
+//                Button("Export") {
+//                    exportTokens()
+//                }
 
-                Button("Import") {
-                    importTokens()
-                }
+//                Button("Import") {
+//                    importTokens()
+//                }
 
-                Button("Delete All") {
-                    showDeleteConfirm = true
-                }
+//                Button("Delete All") {
+//                    showDeleteConfirm = true
+//                }
 
                 Spacer()
 
-                Button("Cancel") { onClose() }
+//                Button("Cancel") { onClose() }
 
                 Button("Add") { addAction() }
                     .keyboardShortcut(.return)
