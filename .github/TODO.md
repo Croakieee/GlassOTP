@@ -2,7 +2,6 @@
 
 ## Features
 
-* Separate Import, Export and Delete buttons in the UI
 * Implement internal automatic backup:
 
   * Store backups in a fixed absolute path
