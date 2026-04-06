@@ -14,7 +14,7 @@
 
   * Timer slider may shift out of position
   * Minor delays in token refresh after the system wakes from sleep
-  * Sometimes when switching between cameras, the pop-up close button may disappear
+  * Sometimes when switching between cameras, the pop-up close button may disappear ( scale problem )
 
 * Update process issues:
 
