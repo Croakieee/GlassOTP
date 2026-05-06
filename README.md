@@ -19,7 +19,18 @@ It allows you to quickly access one-time authentication codes without opening a 
 * Automatic copy to clipboard with optional auto-close
 * Real-time countdown timer for each token
 
+## Editing
+
+Tokens can be renamed or edited.
+You may also:
+
+* View the secret key
+* Regenerate the QR code for another authenticator
+
+Both actions require system authentication.
+
 ![1 UI](screenshots/1.png)
+
 
 ## Security
 
@@ -183,18 +194,12 @@ Manually enter:
 * Code length
 * Period
 
-## Editing Tokens
+## Right-clicking
 
-Tokens can be renamed or edited.
+Right-clicking the menu bar icon opens a context menu that provides quick access to core actions.
 
 ![4 UI](screenshots/4.png)
 
-You may also:
-
-* View the secret key
-* Regenerate the QR code for another authenticator
-
-Both actions require system authentication.
 
 ## Building from Source
 
