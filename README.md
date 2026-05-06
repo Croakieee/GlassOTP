@@ -3,7 +3,7 @@
 GlassOTP is a lightweight TOTP authenticator for macOS designed to live in your menu bar.
 It allows you to quickly access one-time authentication codes without opening a full application window.
 
-![Main UI](screenshots/main1.png)
+![Main UI](screenshots/main.png)
 
 ## Features
 
@@ -19,7 +19,7 @@ It allows you to quickly access one-time authentication codes without opening a 
 * Automatic copy to clipboard with optional auto-close
 * Real-time countdown timer for each token
 
-![1 UI](screenshots/11.png)
+![1 UI](screenshots/1.png)
 
 ## Security
 
@@ -148,7 +148,8 @@ Once launched, GlassOTP appears in the macOS menu bar.
 Then tap + on top left corner.
 From the menu you can:
 
-![2 UI](screenshots/2111.png)
+![2 UI](screenshots/2.png)
+![5 UI](screenshots/5.png)
 
 * Add new tokens
 * Scan QR codes
@@ -173,7 +174,7 @@ Paste an `otpauth://` URL exported from another authenticator.
 
 Manually enter:
 
-![3 UI](screenshots/31.png)
+![3 UI](screenshots/3.png)
 
 * Issuer
 * Account
@@ -186,7 +187,7 @@ Manually enter:
 
 Tokens can be renamed or edited.
 
-![4 UI](screenshots/41.png)
+![4 UI](screenshots/4.png)
 
 You may also:
 
