@@ -10,7 +10,7 @@ enum AddMode: String, CaseIterable {
 }
 
 struct AddTokenSheet: View {
-    let onAddMany: ([ImportedToken]) -> Void
+    let onAddMany: ([ImportedToken]) -> Int
     let onClose: () -> Void
 
     @State private var mode: AddMode = .otpauth
@@ -23,7 +23,7 @@ struct AddTokenSheet: View {
     let store: OTPStore
     
     init(store: OTPStore,
-         onAddMany: @escaping ([ImportedToken]) -> Void,
+         onAddMany: @escaping ([ImportedToken]) -> Int,
          onClose: @escaping () -> Void) {
         
         self.store = store
@@ -546,10 +546,25 @@ struct AddTokenSheet: View {
 
                     let result = ImportExportService.filterDuplicates(imported, store: store)
 
-                    onAddMany(result.added)
+                    let actuallyAdded = onAddMany(result.added)
+
+                    if actuallyAdded > 0 {
+
+                        NotificationService.shared.show(
+                            title: "Import completed",
+                            body: "\(actuallyAdded) new token(s) added, \(result.skipped) skipped"
+                        )
+
+                    } else {
+
+                        NotificationService.shared.show(
+                            title: "Import skipped",
+                            body: "All tokens already exist"
+                        )
+                    }
 
                     withAnimation {
-                        addedMessage = "Imported: \(result.added.count), skipped: \(result.skipped)"
+                        addedMessage = "Imported: \(actuallyAdded), skipped: \(result.skipped)"
                     }
 
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {

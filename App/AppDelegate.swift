@@ -1,13 +1,22 @@
 import AppKit
 import SwiftUI
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+
     private var statusController: StatusBarController?
     private var sceneCoordinator: SceneCoordinator?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Скрыть из Dock на всякий случай (дублирует LSUIElement=YES в Info.plist)
+
         NSApp.setActivationPolicy(.accessory)
+
+        DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                UNUserNotificationCenter.current().delegate = NotificationService.shared
+                NotificationService.shared.requestPermission()
+            }
+        }
 
         let rootView = RootPopoverView()
         sceneCoordinator = SceneCoordinator(rootView: rootView)

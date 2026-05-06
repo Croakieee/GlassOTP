@@ -131,7 +131,13 @@ final class StatusBarController: NSObject {
         alert.addButton(withTitle: "Cancel")
 
         if alert.runModal() == .alertFirstButtonReturn {
+            let count = store.tokens.count
             store.removeAllTokens()
+
+            NotificationService.shared.show(
+                title: "All tokens deleted",
+                body: "\(count) tokens removed"
+            )
         }
     }
 
@@ -152,8 +158,17 @@ final class StatusBarController: NSObject {
                         password: password
                     )
                     try data.write(to: url)
+
+                    NotificationService.shared.show(
+                        title: "Export complete",
+                        body: "Backup saved successfully"
+                    )
+
                 } catch {
-                    print(error)
+                    NotificationService.shared.show(
+                        title: "Export failed",
+                        body: error.localizedDescription
+                    )
                 }
             }
         }
@@ -171,10 +186,47 @@ final class StatusBarController: NSObject {
             self.askPassword { password in
                 do {
                     let data = try Data(contentsOf: url)
-                    let tokens = try BackupService.import(data: data, password: password)
-                    store.addImportedMany(tokens)
+
+                    let imported = try BackupService.import(
+                        data: data,
+                        password: password
+                    )
+
+                    let before = store.tokens.count
+
+                    let added = store.addImportedMany(imported)
+
+                    let skipped = imported.count - added
+
+                    let after = store.tokens.count
+
+                    print("before:", before)
+                    print("imported:", imported.count)
+                    print("added:", added)
+                    print("skipped:", skipped)
+                    print("after:", after)
+
+                    if added > 0 {
+
+                        NotificationService.shared.show(
+                            title: "Import complete",
+                            body: "\(added) new token(s) added, \(skipped) skipped"
+                        )
+
+                    } else {
+
+                        NotificationService.shared.show(
+                            title: "Import skipped",
+                            body: "All tokens already exist"
+                        )
+                    }
+
                 } catch {
-                    print("Import failed")
+
+                    NotificationService.shared.show(
+                        title: "Import failed",
+                        body: "Wrong password or corrupted file"
+                    )
                 }
             }
         }
