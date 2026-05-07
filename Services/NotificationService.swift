@@ -13,9 +13,9 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
             options: [.alert, .sound]
         ) { granted, error in
 
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-            }
+//            DispatchQueue.main.async {
+//                NSApp.activate(ignoringOtherApps: true)
+//            }
 
             if let error = error {
                 print(error)
@@ -46,4 +46,21 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
 
         return [.banner, .sound]
     }
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .openPopoverFromNotification,
+                object: nil
+            )
+        }
+
+        completionHandler()
+    }
+    
 }

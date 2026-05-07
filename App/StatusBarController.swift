@@ -29,7 +29,14 @@ final class StatusBarController: NSObject {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.action = #selector(handleClick(_:))
         }
-
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOpenFromNotification),
+            name: .openPopoverFromNotification,
+            object: nil
+        )
+        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleStore(_:)),
@@ -65,6 +72,16 @@ final class StatusBarController: NSObject {
             showMenu()
         } else {
             togglePopover(sender)
+        }
+    }
+    
+    // Notification on popup - (закрытие после открытия =)
+    @objc private func handleOpenFromNotification() {
+        showPopover(sender: nil)
+
+        // вернуть приложение обратно в "background"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 
@@ -284,7 +301,7 @@ final class StatusBarController: NSObject {
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
-        NSApp.activate(ignoringOtherApps: true)
+    //    NSApp.activate(ignoringOtherApps: true)
     }
 
     private func closePopover(sender: Any?) {
