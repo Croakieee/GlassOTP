@@ -61,15 +61,70 @@ final class OTPStore: ObservableObject {
         commit()
     }
 
-    func addImportedMany(_ list: [ImportedToken]) {
-        var changed = false
+    @discardableResult
+    func addImportedMany(_ list: [ImportedToken]) -> Int {
+
+        var addedCount = 0
+
+        // создаём набор существующих ключей
+        let existingKeys: Set<String> = Set(tokens.compactMap { token in
+
+            guard let secret = try? KeychainService.getSecret(for: token.id) else {
+                return nil
+            }
+
+            let issuer = token.issuer
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+
+            let account = token.account
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+
+            let secretBase32 = Base32.encode(secret)
+
+            return "\(issuer)|\(account)|\(secretBase32)"
+        })
+
+        var mutableKeys = existingKeys
+
         for item in list {
-            try? KeychainService.setSecret(item.secret, for: item.token.id)
+
+            let issuer = item.token.issuer
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+
+            let account = item.token.account
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+
+            let secretBase32 = Base32.encode(item.secret)
+
+            let key = "\(issuer)|\(account)|\(secretBase32)"
+
+            // duplicate
+            if mutableKeys.contains(key) {
+                continue
+            }
+
+            try? KeychainService.setSecret(
+                item.secret,
+                for: item.token.id
+            )
+
             secretCache[item.token.id] = item.secret
             tokens.append(item.token)
-            changed = true
+
+            mutableKeys.insert(key)
+
+            addedCount += 1
         }
-        if changed { commit() }
+
+        if addedCount > 0 {
+            commit()
+        }
+
+        return addedCount
     }
 
     func add(_ token: OTPToken) {

@@ -22,7 +22,7 @@ final class AddTokenWindowController: NSWindowController {
 
     // j,yjdktyysq show
     func show(store: OTPStore,
-              onAddMany: @escaping ([ImportedToken]) -> Void) {
+              onAddMany: @escaping ([ImportedToken]) -> Int) {
 
         // сохраняем store
         self.store = store
