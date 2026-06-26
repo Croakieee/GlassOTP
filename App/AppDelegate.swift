@@ -11,11 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.setActivationPolicy(.accessory)
 
-        DispatchQueue.main.async {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                UNUserNotificationCenter.current().delegate = NotificationService.shared
-                NotificationService.shared.requestPermission()
-            }
+        UNUserNotificationCenter.current().delegate = NotificationService.shared
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            NotificationService.shared.requestPermission()
         }
 
         let rootView = RootPopoverView()

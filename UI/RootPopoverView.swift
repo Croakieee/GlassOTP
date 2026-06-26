@@ -146,7 +146,7 @@ struct RootPopoverView: View {
 
             Button(action: {
 
-                AddTokenWindowController.shared.show(store: store) { list in
+                AddTokenWindowController.shared.show { list in
                     return store.addImportedMany(list)
                 }
 
@@ -183,48 +183,6 @@ struct RootPopoverView: View {
                 .fill(Color.black.opacity(0.08))
         )
     }
-
-    // MARK: Footer
-
-   // private var footer: some View {
-
-   //     VStack(spacing: 8) {
-
-    //        HStack {
-
-     //           Toggle(isOn: $autoCloseOnCopy) {
-      //              Text("Close after copying")
-      //                  .font(.footnote)
-       //                 .foregroundColor(.secondary)
-       //         }
-       //         .toggleStyle(SwitchToggleStyle())
-
-        //        Spacer()
-
-        //    }
-
-         //   HStack {
-
-         //       Toggle(isOn: $appState.pinPopover) {
-         //           Text("Pin popover")
-         //               .font(.footnote)
-          //              .foregroundColor(.secondary)
-          //      }
-          //      .toggleStyle(SwitchToggleStyle())
-
-          //      Spacer()
-
-           //     Button(action: {
-            //        NSApplication.shared.terminate(nil)
-            //    }) {
-            //        Text("Exit")
-        //        }
-//
-       //     }
-
-    //    }
-//         .padding(.top, 4)
-//    }
 
     // MARK: Auth helpers
 

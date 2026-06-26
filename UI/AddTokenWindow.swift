@@ -1,15 +1,10 @@
 import AppKit
 import SwiftUI
 
-final class AddTokenWindowController: NSWindowController {
+final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
     static let shared = AddTokenWindowController()
 
     private var hosting: NSHostingController<AddTokenSheet>?
-
-    // активный store
-    private var store: OTPStore?
-
-    // фиксированный размер окна
     private let kWindowSize = NSSize(width: 600, height: 520)
 
     private override init(window: NSWindow?) {
@@ -20,12 +15,9 @@ final class AddTokenWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // j,yjdktyysq show
-    func show(store: OTPStore,
-              onAddMany: @escaping ([ImportedToken]) -> Int) {
-
-        // сохраняем store
-        self.store = store
+    func show(onAddMany: @escaping ([ImportedToken]) -> Int) {
+        // .accessory apps can't properly bring windows to front without switching to .regular.
+        NSApp.setActivationPolicy(.regular)
 
         if let win = window {
             NSApp.activate(ignoringOtherApps: true)
@@ -34,9 +26,8 @@ final class AddTokenWindowController: NSWindowController {
         }
 
         let sheetView = AddTokenSheet(
-            store: store, // fix
             onAddMany: onAddMany,
-            onClose: { [weak self] in self?.close() }
+            onClose: { [weak self] in self?.window?.close() }
         )
 
         let host = NSHostingController(rootView: sheetView)
@@ -52,17 +43,15 @@ final class AddTokenWindowController: NSWindowController {
         win.title = "Add Token(s)"
         win.contentViewController = host
         win.isReleasedWhenClosed = false
-
-        win.level = .normal
-
+        win.level = .floating          // above the status-bar popover
         win.setContentSize(kWindowSize)
         win.minSize = kWindowSize
         win.maxSize = kWindowSize
-
         win.center()
         win.isMovableByWindowBackground = true
         win.collectionBehavior = [.fullScreenNone]
         win.hidesOnDeactivate = false
+        win.delegate = self
 
         self.window = win
 
@@ -70,10 +59,12 @@ final class AddTokenWindowController: NSWindowController {
         win.makeKeyAndOrderFront(nil)
     }
 
-    override func close() {
-        super.close()
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
         hosting = nil
         window = nil
-        store = nil
+        // Restore menubar-only mode when the window is gone.
+        NSApp.setActivationPolicy(.accessory)
     }
 }

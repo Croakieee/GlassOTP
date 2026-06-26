@@ -1,8 +1,6 @@
 import SwiftUI
 import AppKit
 import AVFoundation
-import Vision
-import CryptoKit
 
 enum AddMode: String, CaseIterable {
     case otpauth = "Link / QR"
@@ -17,23 +15,10 @@ struct AddTokenSheet: View {
 
     // otpauth / migration
     @State private var otpauthText: String = ""
-    
-    // export func delete tokens after
-    @State private var showDeleteConfirm: Bool = false
-    let store: OTPStore
-    
-    init(store: OTPStore,
-         onAddMany: @escaping ([ImportedToken]) -> Int,
-         onClose: @escaping () -> Void) {
-        
-        self.store = store
-        self.onAddMany = onAddMany
-        self.onClose = onClose
-    }
-    
+
     // camera devices
-    @State private var availableCameras: [AVCaptureDevice] = AVCaptureDevice.devices(for: .video)
-    @State private var selectedCameraID: String? = AVCaptureDevice.devices(for: .video).first?.uniqueID
+    @State private var availableCameras: [AVCaptureDevice] = []
+    @State private var selectedCameraID: String? = nil
 
     // manual
     @State private var issuer: String = ""
@@ -61,12 +46,6 @@ struct AddTokenSheet: View {
                 Text("Add token(s)")
                     .font(.title3).fontWeight(.semibold)
                 Spacer()
-//                Button(action: onClose) {
-//                    Image(systemName: "xmark.circle.fill")
-//                }
-//                .buttonStyle(BorderlessButtonStyle())
-//                .help("Close")
-//                 remove extra button
             }
 
             Picker("Mode", selection: $mode) {
@@ -98,31 +77,15 @@ struct AddTokenSheet: View {
             }
 
             HStack {
-
-//                Button("Export") {
-//                    exportTokens()
-//                }
-
-//                Button("Import") {
-//                    importTokens()
-//                }
-
-//                Button("Delete All") {
-//                    showDeleteConfirm = true
-//                }
-
                 Spacer()
-
-//                Button("Cancel") { onClose() }
-
                 Button("Add") { addAction() }
                     .keyboardShortcut(.return)
                     .disabled(!canSubmit)
             }
-
             .padding(.top, 2)
         }
         .padding(18)
+        .onAppear { refreshCameras() }
         // camera sheet
         .sheet(isPresented: $showCameraScanner, onDismiss: { cameraRunning = false }) {
             VStack {
@@ -131,7 +94,6 @@ struct AddTokenSheet: View {
                     Spacer()
                     Button("Close") { showCameraScanner = false }
                 }
-                // меню выбора камеры
                 Picker("Camera", selection: $selectedCameraID) {
                     ForEach(availableCameras, id: \.uniqueID) { device in
                         Text(device.localizedName).tag(Optional(device.uniqueID))
@@ -145,7 +107,7 @@ struct AddTokenSheet: View {
                         self.otpauthText = found
                         self.showCameraScanner = false
                     }
-                }, isRunning: $cameraRunning, selectedDeviceID: $selectedCameraID )
+                }, isRunning: $cameraRunning, selectedDeviceID: $selectedCameraID)
                     .frame(minHeight: 360)
                     .padding()
                 Spacer()
@@ -157,28 +119,6 @@ struct AddTokenSheet: View {
                 }
             }
             .onDisappear { cameraRunning = false }
-        }
-        
-        .alert(isPresented: $showDeleteConfirm) {
-            Alert(
-                title: Text("Delete all tokens?"),
-                message: Text("This will remove ALL tokens permanently."),
-                primaryButton: .destructive(Text("Delete")) {
-
-                    let store = store
-                    store.removeAllTokens()
-
-                    withAnimation {
-                        addedMessage = "All tokens deleted"
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        addedMessage = nil
-                    }
-
-                },
-                secondaryButton: .cancel()
-            )
         }
     }
 
@@ -236,7 +176,6 @@ struct AddTokenSheet: View {
             guard let item = providers.first else { return false }
             var handled = false
 
-            // 1) Файл-URL
             if item.hasItemConformingToTypeIdentifier("public.file-url") {
                 item.loadItem(forTypeIdentifier: "public.file-url", options: nil) { (data, _) in
                     if let urlData = data as? Data,
@@ -249,7 +188,6 @@ struct AddTokenSheet: View {
                 handled = true
             }
 
-            // 2) raw images
             if item.hasItemConformingToTypeIdentifier("public.tiff") {
                 item.loadDataRepresentation(forTypeIdentifier: "public.tiff") { data, _ in
                     if let data = data, let img = NSImage(data: data) { self.importImage(img: img) }
@@ -362,9 +300,8 @@ struct AddTokenSheet: View {
             } else {
                 list = [try buildManualImported()]
             }
-            onAddMany(list)
+            _ = onAddMany(list)
 
-            // показываем краткий success и очищаем поля, оставляя окно открытым
             withAnimation { addedMessage = "Added \(list.count) token(s)" }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
             clearAllFields()
@@ -448,9 +385,7 @@ struct AddTokenSheet: View {
         }
     }
 
-    // Camera helper
     private func startCameraScanner() {
-        // проверим доступ
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             showCameraScanner = true
@@ -470,132 +405,12 @@ struct AddTokenSheet: View {
             errorMessage = "Camera access is denied. Allow it in System Settings → Security & Privacy."
         }
     }
-    
-    // MARK: - Backup
 
-    private func exportTokens() {
-        errorMessage = nil
-
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "backup.glassotp"
-
-        panel.begin { resp in
-            guard resp == .OK, let url = panel.url else { return }
-
-            askPassword { password in
-                do {
-                    let store = store
-
-                    let data = try BackupService.export(
-                        tokens: store.tokens,
-                        store: store,
-                        password: password
-                    )
-
-                    try data.write(to: url)
-
-                    DispatchQueue.main.async {
-
-                        let alert = NSAlert()
-                        alert.messageText = "Export successful"
-                        alert.informativeText = "Do you want to delete all tokens from this device?"
-                        alert.addButton(withTitle: "Delete All")
-                        alert.addButton(withTitle: "Keep")
-
-                        let response = alert.runModal()
-
-                        if response == .alertFirstButtonReturn {
-                            store.removeAllTokens()
-
-                            withAnimation {
-                                addedMessage = "Exported + deleted all tokens"
-                            }
-                        } else {
-                            withAnimation {
-                                addedMessage = "Exported \(store.tokens.count) tokens"
-                            }
-                        }
-
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            addedMessage = nil
-                        }
-                    }
-
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-
-    private func importTokens() {
-        errorMessage = nil
-
-        let panel = NSOpenPanel()
-        panel.allowedFileTypes = ["glassotp"]
-
-        panel.begin { resp in
-            guard resp == .OK, let url = panel.url else { return }
-
-            askPassword { password in
-                do {
-                    let data = try Data(contentsOf: url)
-                    let imported = try BackupService.import(data: data, password: password)
-
-                    let store = store
-
-                    let result = ImportExportService.filterDuplicates(imported, store: store)
-
-                    let actuallyAdded = onAddMany(result.added)
-
-                    if actuallyAdded > 0 {
-
-                        NotificationService.shared.show(
-                            title: "Import completed",
-                            body: "\(actuallyAdded) new token(s) added, \(result.skipped) skipped"
-                        )
-
-                    } else {
-
-                        NotificationService.shared.show(
-                            title: "Import skipped",
-                            body: "All tokens already exist"
-                        )
-                    }
-
-                    withAnimation {
-                        addedMessage = "Imported: \(actuallyAdded), skipped: \(result.skipped)"
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                        addedMessage = nil
-                    }
-
-                } catch {
-                    self.errorMessage = "Wrong password or corrupted file"
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                        withAnimation {
-                            self.errorMessage = nil
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func askPassword(completion: @escaping (String) -> Void) {
-        let alert = NSAlert()
-        alert.messageText = "Enter password for backup file"
-
-        let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        alert.accessoryView = input
-
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            completion(input.stringValue)
+    private func refreshCameras() {
+        let cameras = CameraPreviewView.discoverCameras()
+        availableCameras = cameras
+        if selectedCameraID == nil || !cameras.contains(where: { $0.uniqueID == selectedCameraID }) {
+            selectedCameraID = cameras.first?.uniqueID
         }
     }
 }

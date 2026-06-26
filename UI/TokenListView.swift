@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct TokenListView: View {
     @ObservedObject var store: OTPStore
@@ -41,11 +40,9 @@ struct TokenListView: View {
                             remaining: store.remaining(for: token),
                             period: token.period
                         ) {
-                            copyToClipboard(store.code(for: token))
-
                             if autoCloseOnCopy {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                    NSApp.keyWindow?.performClose(nil)
+                                    NotificationCenter.default.post(name: .autoClosePopover, object: nil)
                                 }
                             }
                         }
@@ -79,9 +76,4 @@ struct TokenListView: View {
         }
     }
 
-    private func copyToClipboard(_ text: String) {
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(text, forType: .string)
-    }
 }

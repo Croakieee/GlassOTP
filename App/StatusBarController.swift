@@ -44,6 +44,13 @@ final class StatusBarController: NSObject {
             object: nil
         )
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAutoClose),
+            name: .autoClosePopover,
+            object: nil
+        )
+
         cancellable = appState.$pinPopover.sink { [weak self] pinned in
             self?.applyPinBehavior(pinned: pinned)
         }
@@ -60,6 +67,12 @@ final class StatusBarController: NSObject {
     @objc private func handleStore(_ note: Notification) {
         if let store = note.object as? OTPStore {
             self.store = store
+        }
+    }
+
+    @objc private func handleAutoClose() {
+        if popover.isShown {
+            closePopover(sender: nil)
         }
     }
 

@@ -131,11 +131,13 @@ struct OtpauthMigrationDecoder {
         case .varint:
             _ = try readVarint(data: data, cursor: &cursor)
         case .fixed64:
+            guard cursor + 8 <= data.count else { throw ImportError.invalidURL }
             cursor += 8
         case .lengthDelimited:
             let l = try readVarint(data: data, cursor: &cursor)
             cursor += Int(l)
         case .fixed32:
+            guard cursor + 4 <= data.count else { throw ImportError.invalidURL }
             cursor += 4
         case .startGroup, .endGroup:
             throw ImportError.invalidURL // не ожидаем групп

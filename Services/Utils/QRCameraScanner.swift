@@ -7,23 +7,14 @@ import Vision
 // NSViewRepresentable
 struct QRCameraScannerView: NSViewRepresentable {
     typealias NSViewType = CameraPreviewView
-    
-    // observer на смену камеры
-    var currentDeviceID: String?
 
     var onFound: (String) -> Void
     @Binding var isRunning: Bool
-
-    // чпоньк
     @Binding var selectedDeviceID: String?
 
     func makeNSView(context: Context) -> CameraPreviewView {
         let view = CameraPreviewView()
         view.coordinator = context.coordinator
-
-        // передаём выбранную камеру
-        // view.selectedDeviceID = selectedDeviceID
-
         return view
     }
 
@@ -31,9 +22,9 @@ struct QRCameraScannerView: NSViewRepresentable {
         DispatchQueue.main.async {
             if nsView.currentDeviceID != selectedDeviceID {
                 nsView.currentDeviceID = selectedDeviceID
-                nsView.restartSession() // рестар после выбора камеры
+                nsView.restartSession()
             }
-            
+
             if isRunning {
                 nsView.startSessionIfNeeded()
             } else {
@@ -64,7 +55,8 @@ struct QRCameraScannerView: NSViewRepresentable {
                     if let results = request.results as? [VNBarcodeObservation] {
                         for obs in results {
                             if let payload = obs.payloadStringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
-                               !payload.isEmpty {
+                               !payload.isEmpty,
+                               payload.lowercased().hasPrefix("otpauth") {
                                 DispatchQueue.main.async {
                                     self.parent.isRunning = false
                                     self.parent.onFound(payload)
@@ -90,19 +82,18 @@ final class CameraPreviewView: NSView {
 
     var captureSession: AVCaptureSession?
     var previewLayer: AVCaptureVideoPreviewLayer?
-
     var coordinator: QRCameraScannerView.Coordinator?
-    
     var currentDeviceID: String?
-    
-    // restart session для подхвата смены камеры
+
+    // Single persistent queue for sample buffer delivery.
+    private let captureQueue = DispatchQueue(label: "glassotp.camera.queue", qos: .userInitiated)
+    // Serial queue for session configuration / startRunning (must not be main).
+    private let sessionQueue = DispatchQueue(label: "glassotp.session.queue", qos: .userInitiated)
+
     func restartSession() {
         stopSession()
         startSessionIfNeeded()
     }
-
-    // чпоньк =)
-    // var selectedDeviceID: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -119,29 +110,26 @@ final class CameraPreviewView: NSView {
     }
 
     func startSessionIfNeeded() {
-        DispatchQueue.main.async { [weak self] in
+        guard captureSession == nil else { return }
+        sessionQueue.async { [weak self] in
             self?._startSession()
         }
     }
 
     private func _startSession() {
-        guard captureSession == nil else { return }
-
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         if status == .denied || status == .restricted { return }
-
         if status == .notDetermined {
             AVCaptureDevice.requestAccess(for: .video) { _ in }
+            return
         }
 
         let session = AVCaptureSession()
         session.sessionPreset = .high
 
-        // выбор камеры
         let device: AVCaptureDevice?
-
         if let id = currentDeviceID {
-            device = AVCaptureDevice.devices(for: .video).first { $0.uniqueID == id }
+            device = CameraPreviewView.discoverCameras().first { $0.uniqueID == id }
         } else {
             device = AVCaptureDevice.default(for: .video)
         }
@@ -153,46 +141,42 @@ final class CameraPreviewView: NSView {
 
         session.addInput(input)
 
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.frame = bounds
-
-        layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
-        layer?.addSublayer(previewLayer)
-
-        self.previewLayer = previewLayer
-
         let dataOutput = AVCaptureVideoDataOutput()
         dataOutput.alwaysDiscardsLateVideoFrames = true
         dataOutput.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
         ]
+        dataOutput.setSampleBufferDelegate(self, queue: captureQueue)
 
-        let queue = DispatchQueue(label: "glassotp.camera.queue")
-        dataOutput.setSampleBufferDelegate(self, queue: queue)
-
-        guard session.canAddOutput(dataOutput) else {
-            previewLayer.removeFromSuperlayer()
-            self.previewLayer = nil
-            return
-        }
-
+        guard session.canAddOutput(dataOutput) else { return }
         session.addOutput(dataOutput)
 
         if let conn = dataOutput.connection(with: .video), conn.isVideoOrientationSupported {
             conn.videoOrientation = .portrait
         }
 
-        self.captureSession = session
+        // Preview layer and captureSession must be set on main (UI + thread safety).
+        // main.sync so captureSession is visible before startRunning() proceeds.
+        DispatchQueue.main.sync { [weak self] in
+            guard let self = self else { return }
+            let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+            previewLayer.videoGravity = .resizeAspectFill
+            previewLayer.frame = self.bounds
+            self.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
+            self.layer?.addSublayer(previewLayer)
+            self.previewLayer = previewLayer
+            self.captureSession = session
 
-        postsFrameChangedNotifications = true
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(frameChanged),
-            name: NSView.frameDidChangeNotification,
-            object: self
-        )
+            self.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(self.frameChanged),
+                name: NSView.frameDidChangeNotification,
+                object: self
+            )
+        }
 
+        // startRunning blocks until ready — keep it off main.
         session.startRunning()
     }
 
@@ -202,16 +186,31 @@ final class CameraPreviewView: NSView {
 
     func stopSession() {
         NotificationCenter.default.removeObserver(self)
-
-        if let session = captureSession {
-            if session.isRunning {
-                session.stopRunning()
-            }
+        if let session = captureSession, session.isRunning {
+            sessionQueue.async { session.stopRunning() }
         }
-
         captureSession = nil
-        previewLayer?.removeFromSuperlayer()
-        previewLayer = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.previewLayer?.removeFromSuperlayer()
+            self?.previewLayer = nil
+        }
+    }
+
+    // MARK: - Camera discovery
+
+    static func discoverCameras() -> [AVCaptureDevice] {
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [
+            .builtInWideAngleCamera,
+            .externalUnknown
+        ]
+        if #available(macOS 14.0, *) {
+            deviceTypes.append(.continuityCamera)
+        }
+        return AVCaptureDevice.DiscoverySession(
+            deviceTypes: deviceTypes,
+            mediaType: .video,
+            position: .unspecified
+        ).devices
     }
 }
 
@@ -219,7 +218,6 @@ extension CameraPreviewView: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-
         coordinator?.handleSampleBuffer(sampleBuffer)
     }
 }
