@@ -23,6 +23,7 @@ struct QRCameraScannerView: NSViewRepresentable {
             if nsView.currentDeviceID != selectedDeviceID {
                 nsView.currentDeviceID = selectedDeviceID
                 nsView.restartSession()
+                return  // restartSession handles start; don't double-call startSessionIfNeeded
             }
 
             if isRunning {
@@ -106,7 +107,22 @@ final class CameraPreviewView: NSView {
     }
 
     deinit {
-        stopSession()
+        // Don't call stopSession() from deinit — it uses weak-self async blocks that
+        // become no-ops after deallocation, leaving the session running. Capture the
+        // session and layer directly so the async closures have no reference to self.
+        NotificationCenter.default.removeObserver(self)
+        let session = captureSession
+        captureSession = nil
+        let layer = previewLayer
+        previewLayer = nil
+        if let session = session {
+            sessionQueue.async {
+                if session.isRunning { session.stopRunning() }
+            }
+        }
+        if let layer = layer {
+            DispatchQueue.main.async { layer.removeFromSuperlayer() }
+        }
     }
 
     func startSessionIfNeeded() {
@@ -155,9 +171,13 @@ final class CameraPreviewView: NSView {
             conn.videoOrientation = .portrait
         }
 
-        // Preview layer and captureSession must be set on main (UI + thread safety).
-        // main.sync so captureSession is visible before startRunning() proceeds.
-        DispatchQueue.main.sync { [weak self] in
+        // Set captureSession on sessionQueue before startRunning so stopSession()
+        // (called from main) can find it if the view is closed immediately.
+        self.captureSession = session
+
+        // Preview layer must be set up on main; async is fine — the layer appears
+        // within one frame, and we no longer block sessionQueue with main.sync.
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             let previewLayer = AVCaptureVideoPreviewLayer(session: session)
             previewLayer.videoGravity = .resizeAspectFill
@@ -165,7 +185,6 @@ final class CameraPreviewView: NSView {
             self.layer?.sublayers?.forEach { $0.removeFromSuperlayer() }
             self.layer?.addSublayer(previewLayer)
             self.previewLayer = previewLayer
-            self.captureSession = session
 
             self.postsFrameChangedNotifications = true
             NotificationCenter.default.addObserver(

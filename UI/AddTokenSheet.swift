@@ -16,8 +16,7 @@ struct AddTokenSheet: View {
     // otpauth / migration
     @State private var otpauthText: String = ""
 
-    // camera devices
-    @State private var availableCameras: [AVCaptureDevice] = []
+    // camera devices — selectedCameraID persists between sheet opens
     @State private var selectedCameraID: String? = nil
 
     // manual
@@ -33,7 +32,6 @@ struct AddTokenSheet: View {
 
     // camera scanner
     @State private var showCameraScanner: Bool = false
-    @State private var cameraRunning: Bool = false
 
     // small success hint
     @State private var addedMessage: String?
@@ -85,40 +83,15 @@ struct AddTokenSheet: View {
             .padding(.top, 2)
         }
         .padding(18)
-        .onAppear { refreshCameras() }
-        // camera sheet
-        .sheet(isPresented: $showCameraScanner, onDismiss: { cameraRunning = false }) {
-            VStack {
-                HStack {
-                    Text("Scan QR code").font(.headline)
-                    Spacer()
-                    Button("Close") { showCameraScanner = false }
-                }
-                Picker("Camera", selection: $selectedCameraID) {
-                    ForEach(availableCameras, id: \.uniqueID) { device in
-                        Text(device.localizedName).tag(Optional(device.uniqueID))
-                    }
-                }
-                .padding(.horizontal)
-                .padding([.top, .horizontal])
-                Divider()
-                QRCameraScannerView(onFound: { found in
-                    DispatchQueue.main.async {
-                        self.otpauthText = found
-                        self.showCameraScanner = false
-                    }
-                }, isRunning: $cameraRunning, selectedDeviceID: $selectedCameraID)
-                    .frame(minHeight: 360)
-                    .padding()
-                Spacer()
-            }
-            .frame(minWidth: 520, minHeight: 420)
-            .onAppear {
-                AVCaptureDevice.requestAccess(for: .video) { _ in
-                    DispatchQueue.main.async { self.cameraRunning = true }
-                }
-            }
-            .onDisappear { cameraRunning = false }
+        .sheet(isPresented: $showCameraScanner) {
+            CameraSheetView(
+                selectedCameraID: $selectedCameraID,
+                onFound: { found in
+                    otpauthText = found
+                    showCameraScanner = false
+                },
+                onClose: { showCameraScanner = false }
+            )
         }
     }
 
@@ -156,6 +129,7 @@ struct AddTokenSheet: View {
     }
 
     // MARK: - Drop zone
+
     private var dropZone: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
@@ -389,16 +363,11 @@ struct AddTokenSheet: View {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             showCameraScanner = true
-            cameraRunning = true
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
-                    if granted {
-                        self.showCameraScanner = true
-                        self.cameraRunning = true
-                    } else {
-                        self.errorMessage = "Camera access is denied."
-                    }
+                    if granted { self.showCameraScanner = true }
+                    else { self.errorMessage = "Camera access is denied." }
                 }
             }
         default:
@@ -406,11 +375,113 @@ struct AddTokenSheet: View {
         }
     }
 
-    private func refreshCameras() {
-        let cameras = CameraPreviewView.discoverCameras()
-        availableCameras = cameras
-        if selectedCameraID == nil || !cameras.contains(where: { $0.uniqueID == selectedCameraID }) {
-            selectedCameraID = cameras.first?.uniqueID
+}
+
+
+// MARK: - Camera scanner sheet
+
+private struct CameraSheetView: View {
+    @Binding var selectedCameraID: String?
+    let onFound: (String) -> Void
+    let onClose: () -> Void
+
+    @State private var cameras: [AVCaptureDevice] = []
+    @State private var isRunning: Bool = false
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black
+
+            QRCameraScannerView(
+                onFound: { payload in
+                    isRunning = false
+                    onFound(payload)
+                },
+                isRunning: $isRunning,
+                selectedDeviceID: $selectedCameraID
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Overlay controls — live above the AVCaptureVideoPreviewLayer regardless of layout.
+            VStack(spacing: 0) {
+                // Top bar
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Close")
+
+                    Spacer()
+
+                    Text("Scan QR Code")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Spacer()
+
+                    // Invisible balance element to keep the title centered
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .hidden()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.55))
+
+                Spacer()
+
+                // Bottom bar — always visible so the user can see / switch cameras.
+                if !cameras.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.white.opacity(0.7))
+
+                        if cameras.count > 1 {
+                            Picker("", selection: $selectedCameraID) {
+                                ForEach(cameras, id: \.uniqueID) { cam in
+                                    Text(cam.localizedName).tag(Optional(cam.uniqueID))
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(maxWidth: 260)
+                            .colorScheme(.dark)
+                        } else {
+                            Text(cameras[0].localizedName)
+                                .font(.system(size: 13))
+                                .foregroundColor(Color.white.opacity(0.85))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.55))
+                }
+            }
         }
+        .frame(width: 540, height: 460)
+        .onAppear {
+            // Discover cameras fresh each time the sheet opens.
+            let found = CameraPreviewView.discoverCameras()
+            cameras = found
+            if selectedCameraID == nil || !found.contains(where: { $0.uniqueID == selectedCameraID }) {
+                selectedCameraID = found.first?.uniqueID
+            }
+
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized:
+                isRunning = true
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    DispatchQueue.main.async { if granted { self.isRunning = true } }
+                }
+            default:
+                break
+            }
+        }
+        .onDisappear { isRunning = false }
     }
 }
