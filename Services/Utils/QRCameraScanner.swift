@@ -107,9 +107,7 @@ final class CameraPreviewView: NSView {
     }
 
     deinit {
-        // Don't call stopSession() from deinit — it uses weak-self async blocks that
-        // become no-ops after deallocation, leaving the session running. Capture the
-        // session and layer directly so the async closures have no reference to self.
+        // Don't call stopSession() from deinit — it uses weak-self async blocks that become no-ops after deallocation, leaving the session running. Capture the session and layer directly so the async closures have no reference to self.
         NotificationCenter.default.removeObserver(self)
         let session = captureSession
         captureSession = nil

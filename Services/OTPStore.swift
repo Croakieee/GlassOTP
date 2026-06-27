@@ -14,8 +14,7 @@ final class OTPStore: ObservableObject {
 
     init(tokens: [OTPToken] = []) {
         if tokens.isEmpty {
-            let loaded = PersistenceService.firstRunSeedIfNeeded()
-            self.tokens = OTPStore.sorted(loaded)
+            self.tokens = OTPStore.sorted(PersistenceService.load())
         } else {
             self.tokens = OTPStore.sorted(tokens)
         }

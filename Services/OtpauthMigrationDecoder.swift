@@ -44,8 +44,8 @@ struct OtpauthMigrationDecoder {
             let (fieldNumber, wtype) = try readKey(data: data, cursor: &cursor)
             switch (fieldNumber, wtype) {
             case (1, .lengthDelimited): // repeated OtpParameters
-                let len = try readVarint(data: data, cursor: &cursor)
-                let subLimit = cursor + Int(len)
+                let len = try readLength(data: data, cursor: &cursor, limit: limit)
+                let subLimit = cursor + len
                 var subCursor = cursor
                 let param = try decodeOtpParameters(from: data, cursor: &subCursor, limit: subLimit)
                 payload.params.append(param)
@@ -53,10 +53,10 @@ struct OtpauthMigrationDecoder {
             case (2, .varint), (3, .varint), (4, .varint):
                 _ = try readVarint(data: data, cursor: &cursor) // version/batch_size/batch_index (ignore)
             case (5, .lengthDelimited):
-                let l = try readVarint(data: data, cursor: &cursor)
-                cursor += Int(l) // batch_id (ignore)
+                let l = try readLength(data: data, cursor: &cursor, limit: limit)
+                cursor += l // batch_id (ignore)
             default:
-                try skipUnknown(wire: wtype, data: data, cursor: &cursor)
+                try skipUnknown(wire: wtype, data: data, cursor: &cursor, limit: limit)
             }
         }
         return payload
@@ -69,37 +69,37 @@ struct OtpauthMigrationDecoder {
             switch fieldNumber {
             case 1: // secret bytes
                 guard wtype == .lengthDelimited else { throw ImportError.invalidURL }
-                let l = try readVarint(data: data, cursor: &cursor)
-                p.secret = data.subdata(in: cursor ..< cursor + Int(l))
-                cursor += Int(l)
+                let l = try readLength(data: data, cursor: &cursor, limit: limit)
+                p.secret = data.subdata(in: cursor ..< cursor + l)
+                cursor += l
             case 2: // name
                 guard wtype == .lengthDelimited else { throw ImportError.invalidURL }
-                let l = try readVarint(data: data, cursor: &cursor)
-                if let s = String(data: data.subdata(in: cursor ..< cursor + Int(l)), encoding: .utf8) {
+                let l = try readLength(data: data, cursor: &cursor, limit: limit)
+                if let s = String(data: data.subdata(in: cursor ..< cursor + l), encoding: .utf8) {
                     p.name = s
                 }
-                cursor += Int(l)
+                cursor += l
             case 3: // issuer
                 guard wtype == .lengthDelimited else { throw ImportError.invalidURL }
-                let l = try readVarint(data: data, cursor: &cursor)
-                if let s = String(data: data.subdata(in: cursor ..< cursor + Int(l)), encoding: .utf8) {
+                let l = try readLength(data: data, cursor: &cursor, limit: limit)
+                if let s = String(data: data.subdata(in: cursor ..< cursor + l), encoding: .utf8) {
                     p.issuer = s
                 }
-                cursor += Int(l)
+                cursor += l
             case 4: // algorithm enum
                 guard wtype == .varint else { throw ImportError.invalidURL }
-                p.algorithm = Int(try readVarint(data: data, cursor: &cursor))
+                p.algorithm = Int(clamping: try readVarint(data: data, cursor: &cursor))
             case 5: // digits enum
                 guard wtype == .varint else { throw ImportError.invalidURL }
-                p.digits = Int(try readVarint(data: data, cursor: &cursor))
+                p.digits = Int(clamping: try readVarint(data: data, cursor: &cursor))
             case 6: // type enum
                 guard wtype == .varint else { throw ImportError.invalidURL }
-                p.type = Int(try readVarint(data: data, cursor: &cursor))
+                p.type = Int(clamping: try readVarint(data: data, cursor: &cursor))
             case 7: // counter (for HOTP)
                 guard wtype == .varint else { throw ImportError.invalidURL }
                 p.counter = try readVarint(data: data, cursor: &cursor)
             default:
-                try skipUnknown(wire: wtype, data: data, cursor: &cursor)
+                try skipUnknown(wire: wtype, data: data, cursor: &cursor, limit: limit)
             }
         }
         return p
@@ -126,18 +126,34 @@ struct OtpauthMigrationDecoder {
         throw ImportError.invalidURL
     }
 
-    private static func skipUnknown(wire: WireType, data: Data, cursor: inout Int) throws {
+    /// Reads a length-delimited size and validates it fits within both the logical
+    /// sub-message limit and the actual buffer. Without this an oversized or malformed
+    /// length would trap `subdata(in:)` / `Int(UInt64)` and crash the app on a hostile QR.
+    private static func readLength(data: Data, cursor: inout Int, limit: Int) throws -> Int {
+        let raw = try readVarint(data: data, cursor: &cursor)
+        guard raw <= UInt64(Int.max) else { throw ImportError.invalidURL }
+        let len = Int(raw)
+        guard len >= 0,
+              cursor <= limit,
+              cursor <= data.count,
+              len <= limit - cursor,
+              len <= data.count - cursor
+        else { throw ImportError.invalidURL }
+        return len
+    }
+
+    private static func skipUnknown(wire: WireType, data: Data, cursor: inout Int, limit: Int) throws {
         switch wire {
         case .varint:
             _ = try readVarint(data: data, cursor: &cursor)
         case .fixed64:
-            guard cursor + 8 <= data.count else { throw ImportError.invalidURL }
+            guard cursor + 8 <= limit, cursor + 8 <= data.count else { throw ImportError.invalidURL }
             cursor += 8
         case .lengthDelimited:
-            let l = try readVarint(data: data, cursor: &cursor)
-            cursor += Int(l)
+            let l = try readLength(data: data, cursor: &cursor, limit: limit)
+            cursor += l
         case .fixed32:
-            guard cursor + 4 <= data.count else { throw ImportError.invalidURL }
+            guard cursor + 4 <= limit, cursor + 4 <= data.count else { throw ImportError.invalidURL }
             cursor += 4
         case .startGroup, .endGroup:
             throw ImportError.invalidURL // не ожидаем групп

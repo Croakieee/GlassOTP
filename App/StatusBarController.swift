@@ -51,6 +51,27 @@ final class StatusBarController: NSObject {
             object: nil
         )
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(suspendAutoClose),
+            name: .lockAuthBegan,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(resumeAutoClose),
+            name: .lockAuthEnded,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handlePopoverDidClose),
+            name: NSPopover.didCloseNotification,
+            object: popover
+        )
+
         cancellable = appState.$pinPopover.sink { [weak self] pinned in
             self?.applyPinBehavior(pinned: pinned)
         }
@@ -74,6 +95,26 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             closePopover(sender: nil)
         }
+    }
+
+    // While Touch ID / password auth is on screen, stop the popover from auto-closing
+    // (the auth dialog steals focus, which would dismiss a transient popover).
+    @objc private func suspendAutoClose() {
+        popover.behavior = .applicationDefined
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+    }
+
+    @objc private func resumeAutoClose() {
+        applyPinBehavior(pinned: appState.pinPopover)
+    }
+
+    // Authoritative "popover closed" signal (fires for transient auto-close too, unlike
+    // our closePopover). Drives the app lock's re-lock on close.
+    @objc private func handlePopoverDidClose() {
+        NotificationCenter.default.post(name: .popoverDidClose, object: nil)
     }
 
     // MARK: - Click handling
@@ -180,7 +221,7 @@ final class StatusBarController: NSObject {
         panel.begin { resp in
             guard resp == .OK, let url = panel.url else { return }
 
-            self.askPassword { password in
+            self.askPassword(confirm: true) { password in
                 do {
                     let data = try BackupService.export(
                         tokens: store.tokens,
@@ -222,19 +263,8 @@ final class StatusBarController: NSObject {
                         password: password
                     )
 
-                    let before = store.tokens.count
-
                     let added = store.addImportedMany(imported)
-
                     let skipped = imported.count - added
-
-                    let after = store.tokens.count
-
-                    print("before:", before)
-                    print("imported:", imported.count)
-                    print("added:", added)
-                    print("skipped:", skipped)
-                    print("after:", after)
 
                     if added > 0 {
 
@@ -262,19 +292,53 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func askPassword(completion: @escaping (String) -> Void) {
+    private func askPassword(confirm: Bool = false,
+                             errorText: String? = nil,
+                             completion: @escaping (String) -> Void) {
         let alert = NSAlert()
-        alert.messageText = "Enter password"
+        alert.messageText = confirm ? "Set backup password" : "Enter password"
+        if let errorText = errorText {
+            alert.informativeText = errorText
+        }
 
-        let input = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
-        alert.accessoryView = input
+        let pwField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        if confirm { pwField.placeholderString = "Password" }
 
+        let confirmField: NSSecureTextField?
+        if confirm {
+            let field2 = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+            field2.placeholderString = "Repeat password"
+            let stack = NSStackView(views: [pwField, field2])
+            stack.orientation = .vertical
+            stack.spacing = 8
+            stack.frame = NSRect(x: 0, y: 0, width: 240, height: 56)
+            alert.accessoryView = stack
+            confirmField = field2
+        } else {
+            alert.accessoryView = pwField
+            confirmField = nil
+        }
+
+        alert.window.initialFirstResponder = pwField
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
 
-        if alert.runModal() == .alertFirstButtonReturn {
-            completion(input.stringValue)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let password = pwField.stringValue
+
+        if confirm {
+            if password.isEmpty {
+                askPassword(confirm: true, errorText: "Password can't be empty.", completion: completion)
+                return
+            }
+            if password != (confirmField?.stringValue ?? "") {
+                askPassword(confirm: true, errorText: "Passwords don't match. Try again.", completion: completion)
+                return
+            }
         }
+
+        completion(password)
     }
 
     // MARK: - Popover
@@ -315,6 +379,10 @@ final class StatusBarController: NSObject {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
     //    NSApp.activate(ignoringOtherApps: true)
+
+        // Re-evaluate the lock each time the popover opens (NSPopover doesn't reliably
+        // re-fire SwiftUI .onAppear on subsequent shows).
+        NotificationCenter.default.post(name: .popoverDidShow, object: nil)
     }
 
     private func closePopover(sender: Any?) {
