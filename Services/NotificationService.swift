@@ -11,15 +11,8 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     func requestPermission() {
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound]
-        ) { granted, error in
-
-//            DispatchQueue.main.async {
-//                NSApp.activate(ignoringOtherApps: true)
-//            }
-
-            if let error = error {
-                print(error)
-            }
+        ) { _, _ in
+            // permission result is reflected by the system; nothing to do here
         }
     }
 

@@ -34,7 +34,7 @@ struct TOTPGenerator {
     static func timeRemaining(for date: Date, period: Int) -> Int {
         let s = Int(date.timeIntervalSince1970)
         let rem = period - (s % period)
-        return rem == period ? 0 : rem
+        return rem == period ? period : rem
     }
 
     private static func pow10(_ n: Int) -> UInt32 {

@@ -1,5 +1,6 @@
 import SwiftUI
 import LocalAuthentication
+import Combine
 
 private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
@@ -8,7 +9,10 @@ struct RootPopoverView: View {
     @StateObject private var store = OTPStore.sampleStore()
     @ObservedObject private var appState = AppState.shared
 
-    @State private var autoCloseOnCopy: Bool = true
+    // app-wide lock gate (opt-in via appState.requireUnlock).
+    // `unlocked` holds only for the current open session: it's reset on every popover close.
+    @State private var unlocked: Bool = false
+    @State private var authInProgress: Bool = false
 
     // rename
     @State private var renameHandle: RenameHandle?
@@ -30,25 +34,18 @@ struct RootPopoverView: View {
 
     var body: some View {
 
-        ZStack {
+        VStack(alignment: .leading, spacing: 8) {
 
-            VisualEffectBackground(material: .hud, blendingMode: .behindWindow)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .padding(6)
+            header
+                .padding(.horizontal, 4)   // buttons need clearance from the rounded corners
 
-            VStack(alignment: .leading, spacing: 12) {
-
-                header
+            if showContent {
                 searchField
 
                 TokenListView(
                     store: store,
                     timer: store.timer,
-                    autoCloseOnCopy: $autoCloseOnCopy,
+                    autoCloseOnCopy: $appState.autoCloseOnCopy,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
@@ -56,16 +53,42 @@ struct RootPopoverView: View {
                     onShowQR: { id in beginShowQR(id) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                
-              //  footer
-                Spacer(minLength: 0)
+            } else {
+                lockView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(16)
+
+            Spacer(minLength: 0)
         }
-        .background(Color.clear)
-//новый блок
+        // Snug padding: close to the rounded edges but with a little breathing room.
+        .padding(.horizontal, 6)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        // Single rounded card that fills the popover: content + material are clipped to the
+        // same shape, so the token area follows the rounded contour instead of square corners,
+        // and there's no inset ring doubling the border.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(VisualEffectBackground(material: .hud, blendingMode: .behindWindow))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
         .onAppear {
             NotificationCenter.default.post(name: .storeReady, object: store)
+            applyLockOnOpen()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
+            applyLockOnOpen()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
+            // Re-lock whenever the popover closes so the next open requires auth again.
+            guard !authInProgress else { return }
+            if appState.requireUnlock { unlocked = false }
+        }
+        .onChange(of: appState.requireUnlock) { enabled in
+            // Enabling locks immediately; disabling reveals the content.
+            unlocked = !enabled
         }
 
         .sheet(item: $renameHandle, onDismiss: {
@@ -144,9 +167,19 @@ struct RootPopoverView: View {
 
             Spacer()
 
+            Menu {
+                Toggle("Close after copy", isOn: $appState.autoCloseOnCopy)
+                Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .menuStyle(BorderlessButtonMenuStyle())
+            .frame(width: 38)
+            .help("Settings")
+
             Button(action: {
 
-                AddTokenWindowController.shared.show(store: store) { list in
+                AddTokenWindowController.shared.show { list in
                     return store.addImportedMany(list)
                 }
 
@@ -158,6 +191,74 @@ struct RootPopoverView: View {
             .buttonStyle(BorderlessButtonStyle())
             .help("Add token")
 
+        }
+    }
+
+    // MARK: Lock screen
+
+    private var showContent: Bool {
+        !appState.requireUnlock || unlocked
+    }
+
+    private var lockView: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "lock.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.secondary)
+            Text("Locked")
+                .font(.headline)
+            Text("Authenticate to view your codes.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            Button(action: promptUnlock) {
+                Label("Unlock", systemImage: "touchid")
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Locks on every fresh popover open — the unlocked state never persists across opens.
+    /// Does NOT auto-prompt; the user taps Unlock when ready.
+    private func applyLockOnOpen() {
+        if appState.requireUnlock { unlocked = false }
+    }
+
+    private func promptUnlock() {
+        runLockAuth { unlocked = true }
+    }
+
+    /// Binding for the "Require Touch ID" toggle. Turning it ON is free; turning it OFF
+    /// while the screen is locked requires authentication first — otherwise it could be
+    /// unticked straight from the lock screen to bypass the lock.
+    private var requireUnlockBinding: Binding<Bool> {
+        Binding(
+            get: { appState.requireUnlock },
+            set: { newValue in
+                if newValue {
+                    appState.requireUnlock = true
+                } else if appState.requireUnlock && !unlocked {
+                    // defer so the menu dismisses before the system auth dialog appears
+                    DispatchQueue.main.async { runLockAuth { appState.requireUnlock = false } }
+                } else {
+                    appState.requireUnlock = false
+                }
+            }
+        )
+    }
+
+    /// Runs the lock authentication: keeps the popover open across the system dialog and
+    /// always forces a real prompt (ignores the shared show-secret cache).
+    private func runLockAuth(_ onSuccess: @escaping () -> Void) {
+        guard !authInProgress else { return }
+        authInProgress = true
+        NotificationCenter.default.post(name: .lockAuthBegan, object: nil)
+        authenticate(force: true) { success in
+            authInProgress = false
+            NotificationCenter.default.post(name: .lockAuthEnded, object: nil)
+            if success { onSuccess() }
         }
     }
 
@@ -184,48 +285,6 @@ struct RootPopoverView: View {
         )
     }
 
-    // MARK: Footer
-
-   // private var footer: some View {
-
-   //     VStack(spacing: 8) {
-
-    //        HStack {
-
-     //           Toggle(isOn: $autoCloseOnCopy) {
-      //              Text("Close after copying")
-      //                  .font(.footnote)
-       //                 .foregroundColor(.secondary)
-       //         }
-       //         .toggleStyle(SwitchToggleStyle())
-
-        //        Spacer()
-
-        //    }
-
-         //   HStack {
-
-         //       Toggle(isOn: $appState.pinPopover) {
-         //           Text("Pin popover")
-         //               .font(.footnote)
-          //              .foregroundColor(.secondary)
-          //      }
-          //      .toggleStyle(SwitchToggleStyle())
-
-          //      Spacer()
-
-           //     Button(action: {
-            //        NSApplication.shared.terminate(nil)
-            //    }) {
-            //        Text("Exit")
-        //        }
-//
-       //     }
-
-    //    }
-//         .padding(.top, 4)
-//    }
-
     // MARK: Auth helpers
 
     private func isAuthRecent() -> Bool {
@@ -233,9 +292,9 @@ struct RootPopoverView: View {
         return Date().timeIntervalSince(lastAuthTime) < 30
     }
 
-    private func authenticate(_ completion: @escaping (Bool) -> Void) {
+    private func authenticate(force: Bool = false, _ completion: @escaping (Bool) -> Void) {
 
-        if isAuthRecent() {
+        if !force && isAuthRecent() {
             completion(true)
             return
         }
