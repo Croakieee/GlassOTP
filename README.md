@@ -3,7 +3,7 @@
 GlassOTP is a lightweight TOTP authenticator for macOS designed to live in your menu bar.
 It allows you to quickly access one-time authentication codes without opening a full application window.
 
-![Main UI](screenshots/main.png)
+![Main UI](screenshots/main1.png)
 
 ## Features
 
@@ -29,7 +29,7 @@ You may also:
 
 Both actions require system authentication.
 
-![1 UI](screenshots/1.png)
+![1 UI](screenshots/11.png)
 
 
 ## Security
@@ -160,7 +160,7 @@ Then tap + on top left corner.
 From the menu you can:
 
 ![2 UI](screenshots/2.png)
-![5 UI](screenshots/5.png)
+![5 UI](screenshots/55.png)
 
 * Add new tokens
 * Scan QR codes
