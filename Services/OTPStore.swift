@@ -53,7 +53,7 @@ final class OTPStore: ObservableObject {
             secretCache[token.id] = secret
             return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
         } catch {
-            return "------"
+            return String(repeating: "-", count: token.digits)
         }
     }
 
@@ -62,19 +62,6 @@ final class OTPStore: ObservableObject {
     }
 
     // MARK: - Mutations (+ persist)
-
-    func addImported(_ imported: ImportedToken) {
-        // Persist the secret FIRST. If the keychain write fails, don't add the token at all —
-        // otherwise we'd save a secret-less "ghost" that only ever shows "------".
-        do {
-            try KeychainService.setSecret(imported.secret, for: imported.token.id)
-        } catch {
-            return
-        }
-        secretCache[imported.token.id] = imported.secret
-        tokens.append(imported.token)
-        commit()
-    }
 
     @discardableResult
     func addImportedMany(_ list: [ImportedToken]) -> Int {
@@ -148,11 +135,6 @@ final class OTPStore: ObservableObject {
         return addedCount
     }
 
-    func add(_ token: OTPToken) {
-        tokens.append(token)
-        commit()
-    }
-
     func remove(_ tokenID: UUID) {
         if let idx = tokens.firstIndex(where: { $0.id == tokenID }) {
             let token = tokens[idx]
@@ -206,8 +188,6 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    static func sampleStore() -> OTPStore { OTPStore(tokens: []) }
-    
     // MARK: - Secret editing
 
     func secret(for token: OTPToken) -> String? {
@@ -240,16 +220,4 @@ final class OTPStore: ObservableObject {
         commit()
     }
 
-    func isDuplicate(_ token: OTPToken, secret: Data) -> Bool {
-        for existing in tokens {
-            if existing.issuer == token.issuer &&
-               existing.account == token.account,
-               let existingSecret = try? KeychainService.getSecret(for: existing.id),
-               existingSecret == secret {
-                return true
-            }
-        }
-        return false
-    }
-    
 }

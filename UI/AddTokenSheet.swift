@@ -342,20 +342,28 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
-        do {
-            let link = try QRService.scanOtpauth(from: url)
-            self.otpauthText = link
-        } catch {
-            self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        // Vision QR detection can be slow on large images — keep it off the main thread and
+        // hop back only to update @State.
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let link = try QRService.scanOtpauth(from: url)
+                DispatchQueue.main.async { self.otpauthText = link }
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                DispatchQueue.main.async { self.errorMessage = message }
+            }
         }
     }
 
     private func importImage(img: NSImage) {
-        do {
-            let link = try QRService.scanOtpauth(from: img)
-            self.otpauthText = link
-        } catch {
-            self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let link = try QRService.scanOtpauth(from: img)
+                DispatchQueue.main.async { self.otpauthText = link }
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                DispatchQueue.main.async { self.errorMessage = message }
+            }
         }
     }
 

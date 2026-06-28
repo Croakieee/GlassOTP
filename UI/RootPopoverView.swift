@@ -6,8 +6,13 @@ private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
 struct RootPopoverView: View {
 
-    @StateObject private var store = OTPStore.sampleStore()
+    // Owned by AppDelegate and injected, so the same instance backs the status-bar menu.
+    @ObservedObject private var store: OTPStore
     @ObservedObject private var appState = AppState.shared
+
+    init(store: OTPStore) {
+        _store = ObservedObject(wrappedValue: store)
+    }
 
     // app-wide lock gate (opt-in via appState.requireUnlock).
     // `unlocked` holds only for the current open session: it's reset on every popover close.
@@ -75,7 +80,6 @@ struct RootPopoverView: View {
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
         .onAppear {
-            NotificationCenter.default.post(name: .storeReady, object: store)
             applyLockOnOpen()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in

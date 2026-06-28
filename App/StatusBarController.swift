@@ -9,10 +9,11 @@ final class StatusBarController: NSObject {
     private var cancellable: AnyCancellable?
     private let appState = AppState.shared
 
-    private var store: OTPStore?
+    private let store: OTPStore
 
-    init(popover: NSPopover) {
+    init(popover: NSPopover, store: OTPStore) {
         self.popover = popover
+        self.store = store
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -37,13 +38,6 @@ final class StatusBarController: NSObject {
             object: nil
         )
         
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleStore(_:)),
-            name: .storeReady,
-            object: nil
-        )
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAutoClose),
@@ -83,12 +77,6 @@ final class StatusBarController: NSObject {
         if let monitor = eventMonitor { NSEvent.removeMonitor(monitor) }
         cancellable?.cancel()
         NotificationCenter.default.removeObserver(self)
-    }
-
-    @objc private func handleStore(_ note: Notification) {
-        if let store = note.object as? OTPStore {
-            self.store = store
-        }
     }
 
     @objc private func handleAutoClose() {
@@ -193,8 +181,6 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func deleteAll() {
-        guard let store = store else { return }
-
         let alert = NSAlert()
         alert.messageText = "Delete all tokens?"
         alert.informativeText = "This action cannot be undone."
@@ -213,48 +199,60 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func exportTokens() {
-        guard let store = store else { return }
-
+        let store = self.store
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "backup.glassotp"
 
-        panel.begin { resp in
-            guard resp == .OK, let url = panel.url else { return }
+        // runModal (not begin) + activate so the panel comes to the front of an accessory app
+        // instead of opening behind whatever window is currently active.
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
 
-            self.askPassword(confirm: true) { password in
+        askPassword(confirm: true) { password in
+            // Snapshot on main, then derive the key (PBKDF2) and seal off-main so the UI
+            // doesn't freeze during export.
+            let tokens = store.tokens
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let data = try BackupService.export(
-                        tokens: store.tokens,
+                        tokens: tokens,
                         store: store,
                         password: password
                     )
                     try data.write(to: url)
 
-                    NotificationService.shared.show(
-                        title: "Export complete",
-                        body: "Backup saved successfully"
-                    )
-
+                    DispatchQueue.main.async {
+                        NotificationService.shared.show(
+                            title: "Export complete",
+                            body: "Backup saved successfully"
+                        )
+                    }
                 } catch {
-                    NotificationService.shared.show(
-                        title: "Export failed",
-                        body: error.localizedDescription
-                    )
+                    let message = error.localizedDescription
+                    DispatchQueue.main.async {
+                        NotificationService.shared.show(
+                            title: "Export failed",
+                            body: message
+                        )
+                    }
                 }
             }
         }
     }
 
     @objc private func importTokens() {
-        guard let store = store else { return }
-
+        let store = self.store
         let panel = NSOpenPanel()
         panel.allowedFileTypes = ["glassotp"]
 
-        panel.begin { resp in
-            guard resp == .OK, let url = panel.url else { return }
+        // runModal (not begin) + activate so the panel comes to the front of an accessory app
+        // instead of opening behind whatever window is currently active.
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
 
-            self.askPassword { password in
+        askPassword { password in
+            // Read + decrypt (PBKDF2) off-main; mutate the store back on main.
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let data = try Data(contentsOf: url)
 
@@ -263,30 +261,30 @@ final class StatusBarController: NSObject {
                         password: password
                     )
 
-                    let added = store.addImportedMany(imported)
-                    let skipped = imported.count - added
+                    DispatchQueue.main.async {
+                        let added = store.addImportedMany(imported)
+                        let skipped = imported.count - added
 
-                    if added > 0 {
-
-                        NotificationService.shared.show(
-                            title: "Import complete",
-                            body: "\(added) new token(s) added, \(skipped) skipped"
-                        )
-
-                    } else {
-
-                        NotificationService.shared.show(
-                            title: "Import skipped",
-                            body: "All tokens already exist"
-                        )
+                        if added > 0 {
+                            NotificationService.shared.show(
+                                title: "Import complete",
+                                body: "\(added) new token(s) added, \(skipped) skipped"
+                            )
+                        } else {
+                            NotificationService.shared.show(
+                                title: "Import skipped",
+                                body: "All tokens already exist"
+                            )
+                        }
                     }
 
                 } catch {
-
-                    NotificationService.shared.show(
-                        title: "Import failed",
-                        body: "Wrong password or corrupted file"
-                    )
+                    DispatchQueue.main.async {
+                        NotificationService.shared.show(
+                            title: "Import failed",
+                            body: "Wrong password or corrupted file"
+                        )
+                    }
                 }
             }
         }
@@ -301,20 +299,32 @@ final class StatusBarController: NSObject {
             alert.informativeText = errorText
         }
 
-        let pwField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        if confirm { pwField.placeholderString = "Password" }
+        // Build the accessory with explicit frames instead of an NSStackView: inside an
+        // NSAlert the stack view's intrinsic sizing collapsed the secure fields to a sliver.
+        let fieldWidth: CGFloat = 240
+        let fieldHeight: CGFloat = 24
 
+        let pwField: NSSecureTextField
         let confirmField: NSSecureTextField?
         if confirm {
-            let field2 = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-            field2.placeholderString = "Repeat password"
-            let stack = NSStackView(views: [pwField, field2])
-            stack.orientation = .vertical
-            stack.spacing = 8
-            stack.frame = NSRect(x: 0, y: 0, width: 240, height: 56)
-            alert.accessoryView = stack
-            confirmField = field2
+            // Fixed-size container, top field = password, bottom field = repeat.
+            let spacing: CGFloat = 8
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: fieldWidth, height: fieldHeight * 2 + spacing))
+
+            let top = NSSecureTextField(frame: NSRect(x: 0, y: fieldHeight + spacing, width: fieldWidth, height: fieldHeight))
+            top.placeholderString = "Password"
+
+            let bottom = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: fieldWidth, height: fieldHeight))
+            bottom.placeholderString = "Repeat password"
+
+            container.addSubview(top)
+            container.addSubview(bottom)
+
+            alert.accessoryView = container
+            pwField = top
+            confirmField = bottom
         } else {
+            pwField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: fieldWidth, height: fieldHeight))
             alert.accessoryView = pwField
             confirmField = nil
         }
@@ -323,6 +333,7 @@ final class StatusBarController: NSObject {
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
 
+        NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         let password = pwField.stringValue
@@ -374,7 +385,7 @@ final class StatusBarController: NSObject {
     private func showPopover(sender: Any?) {
         guard let button = statusItem.button else { return }
 
-        store?.timer.resume()
+        store.timer.resume()
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
@@ -387,6 +398,6 @@ final class StatusBarController: NSObject {
 
     private func closePopover(sender: Any?) {
         popover.performClose(sender)
-        store?.timer.pause()
+        store.timer.pause()
     }
 }
