@@ -71,7 +71,11 @@ struct TokenListView: View {
                         }
                     }
                 }
+                // Reserve a lane on the right for the overlay scroll indicator so it sits
+                // in its own gutter instead of overlapping the token rows. (.scrollIndicators
+                // would be cleaner but is macOS 13+; this stays compatible with 11.7.)
                 .padding(.vertical, 2)
+                .padding(.trailing, 12)
             }
         }
     }

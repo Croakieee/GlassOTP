@@ -14,10 +14,20 @@ final class OTPStore: ObservableObject {
 
     init(tokens: [OTPToken] = []) {
         if tokens.isEmpty {
-            self.tokens = OTPStore.sorted(PersistenceService.load())
+            self.tokens = OTPStore.sorted(OTPStore.dropOrphans(PersistenceService.load()))
         } else {
+            // Explicit injection (previews / tests): take as-is, no keychain involvement.
             self.tokens = OTPStore.sorted(tokens)
         }
+    }
+
+    /// Drops persisted tokens whose secret is no longer in the keychain ("ghosts" that would
+    /// only ever render as "------"). Safe by construction: if the vault can't be read
+    /// (corruption / locked keychain) `storedSecretIDs()` throws and we keep EVERY token, so a
+    /// transient failure never wipes the list.
+    private static func dropOrphans(_ arr: [OTPToken]) -> [OTPToken] {
+        guard let ids = try? KeychainService.storedSecretIDs() else { return arr }
+        return arr.filter { ids.contains($0.id.uuidString) }
     }
 
     // MARK: - Derived
@@ -54,7 +64,13 @@ final class OTPStore: ObservableObject {
     // MARK: - Mutations (+ persist)
 
     func addImported(_ imported: ImportedToken) {
-        try? KeychainService.setSecret(imported.secret, for: imported.token.id)
+        // Persist the secret FIRST. If the keychain write fails, don't add the token at all —
+        // otherwise we'd save a secret-less "ghost" that only ever shows "------".
+        do {
+            try KeychainService.setSecret(imported.secret, for: imported.token.id)
+        } catch {
+            return
+        }
         secretCache[imported.token.id] = imported.secret
         tokens.append(imported.token)
         commit()
@@ -106,10 +122,16 @@ final class OTPStore: ObservableObject {
                 continue
             }
 
-            try? KeychainService.setSecret(
-                item.secret,
-                for: item.token.id
-            )
+            // Persist the secret first; only count/add the token if it actually stuck.
+            // A failed keychain write must not leave a secret-less "------" token behind.
+            do {
+                try KeychainService.setSecret(
+                    item.secret,
+                    for: item.token.id
+                )
+            } catch {
+                continue
+            }
 
             secretCache[item.token.id] = item.secret
             tokens.append(item.token)
