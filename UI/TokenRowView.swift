@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct TokenRowView: View, Equatable {
+struct TokenRowView: View {
     let title: String
     let code: String
     let remaining: Int
@@ -107,6 +107,10 @@ struct TokenRowView: View, Equatable {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(code, forType: .string)
+        // Mark the entry as sensitive so well-behaved clipboard managers don't log/retain it.
+        // (No auto-clear: the code stays available until the next copy, so a paste never races
+        // a timer.)
+        pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
 
         onCopy()
         copied = true
@@ -118,10 +122,5 @@ struct TokenRowView: View, Equatable {
                 copied = false
             }
         }
-    }
-    
-    static func == (lhs: TokenRowView, rhs: TokenRowView) -> Bool {
-        lhs.code == rhs.code &&
-        lhs.remaining == rhs.remaining
     }
 }

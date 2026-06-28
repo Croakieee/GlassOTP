@@ -1,13 +1,19 @@
 import SwiftUI
 import LocalAuthentication
 import Combine
+import UserNotifications
 
 private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
 struct RootPopoverView: View {
 
-    @StateObject private var store = OTPStore.sampleStore()
+    // Owned by AppDelegate and injected, so the same instance backs the status-bar menu.
+    @ObservedObject private var store: OTPStore
     @ObservedObject private var appState = AppState.shared
+
+    init(store: OTPStore) {
+        _store = ObservedObject(wrappedValue: store)
+    }
 
     // app-wide lock gate (opt-in via appState.requireUnlock).
     // `unlocked` holds only for the current open session: it's reset on every popover close.
@@ -32,12 +38,17 @@ struct RootPopoverView: View {
     @State private var deleteTokenID: UUID?
     @State private var showDeleteAlert: Bool = false
 
+    // compact in-UI notice when notifications are off (so missing export/import banners are explained)
+    @State private var notificationsDenied: Bool = false
+
     var body: some View {
 
         VStack(alignment: .leading, spacing: 8) {
 
             header
                 .padding(.horizontal, 4)   // buttons need clearance from the rounded corners
+
+            warnings
 
             if showContent {
                 searchField
@@ -75,11 +86,12 @@ struct RootPopoverView: View {
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
         .onAppear {
-            NotificationCenter.default.post(name: .storeReady, object: store)
             applyLockOnOpen()
+            refreshNotificationStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
             applyLockOnOpen()
+            refreshNotificationStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
             // Re-lock whenever the popover closes so the next open requires auth again.
@@ -191,6 +203,46 @@ struct RootPopoverView: View {
             .buttonStyle(BorderlessButtonStyle())
             .help("Add token")
 
+        }
+    }
+
+    // MARK: Warnings
+
+    @ViewBuilder
+    private var warnings: some View {
+        if store.vaultCorrupted {
+            warningLine(
+                icon: "exclamationmark.triangle.fill",
+                text: "Secret storage looks damaged. Restore from a backup.",
+                color: .orange
+            )
+        }
+        if notificationsDenied {
+            warningLine(
+                icon: "bell.slash",
+                text: "Notifications are off — some confirmations won’t appear.",
+                color: .secondary
+            )
+        }
+    }
+
+    private func warningLine(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+            Text(text)
+                .font(.footnote)
+            Spacer(minLength: 0)
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 6)
+    }
+
+    /// Refresh whether notifications are denied, so the compact notice reflects current state.
+    private func refreshNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let denied = settings.authorizationStatus == .denied
+            DispatchQueue.main.async { notificationsDenied = denied }
         }
     }
 

@@ -7,6 +7,7 @@ enum KeychainError: Error, LocalizedError {
     case copy(OSStatus)
     case delete(OSStatus)
     case notFound
+    case decode
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +16,7 @@ enum KeychainError: Error, LocalizedError {
         case .copy(let s): return "Keychain read failed: \(s)"
         case .delete(let s): return "Keychain delete failed: \(s)"
         case .notFound: return "Secret not found in Keychain."
+        case .decode: return "Keychain vault is corrupted (decode failed)."
         }
     }
 }
@@ -82,6 +84,18 @@ struct KeychainService {
         }
     }
 
+    /// UUID strings that currently have a stored secret in the vault.
+    ///
+    /// Throws if the vault can't be read (corruption / keychain access failure). Callers must
+    /// treat a throw as "unknown — keep everything", never as "nothing present", otherwise a
+    /// transient failure would look like every token lost its secret.
+    static func storedSecretIDs() throws -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadVaultLocked()
+        return Set((vault ?? [:]).keys)
+    }
+
     // MARK: - Vault load / persist (caller must hold `lock`)
 
     private static func loadVaultLocked() throws {
@@ -89,7 +103,14 @@ struct KeychainService {
 
         // 1) Try the consolidated blob.
         if let data = try readItemData(account: vaultAccount) {
-            vault = (try? JSONDecoder().decode([String: Data].self, from: data)) ?? [:]
+            // The blob exists. If it fails to decode (corruption / partial write / future
+            // schema), DO NOT fall back to an empty dict: that would make the next write
+            // overwrite the still-intact blob and lose every secret. Throw instead, leaving
+            // the keychain item untouched so the situation stays recoverable.
+            guard let decoded = try? JSONDecoder().decode([String: Data].self, from: data) else {
+                throw KeychainError.decode
+            }
+            vault = decoded
             return
         }
 

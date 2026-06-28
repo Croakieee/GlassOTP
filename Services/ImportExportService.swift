@@ -79,13 +79,11 @@ struct ImportExportService {
             if let dStr = q["digits"], let d = Int(dStr), (d == 6 || d == 8) { return d }
             return 6
         }()
-        guard digits == 6 || digits == 8 else { throw ImportError.badDigits }
 
         let period: Int = {
             if let pStr = q["period"], let p = Int(pStr), p > 0 { return p }
             return 30
         }()
-        guard period > 0 else { throw ImportError.badPeriod }
 
         let algorithm: OTPAlgorithm = {
             if let aStr = q["algorithm"]?.uppercased() {
@@ -159,23 +157,5 @@ struct ImportExportService {
         if result.isEmpty { throw ImportError.unsupportedType }
         return result
     }
-    
-    // MARK: - Dedup
 
-    static func filterDuplicates(_ list: [ImportedToken], store: OTPStore) -> (added: [ImportedToken], skipped: Int) {
-
-        var added: [ImportedToken] = []
-        var skipped = 0
-
-        for item in list {
-            if store.isDuplicate(item.token, secret: item.secret) {
-                skipped += 1
-            } else {
-                added.append(item)
-            }
-        }
-
-        return (added, skipped)
-    }
-    
 }

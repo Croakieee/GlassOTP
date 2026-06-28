@@ -15,6 +15,11 @@ final class TimeStepTimer: ObservableObject {
 
     private func start() {
 
+        // Refresh immediately: the scheduled timer's first fire is up to 1s away, and after a
+        // pause/resume (popover reopen) or sleep `now` is otherwise stale, briefly showing the
+        // code/countdown from when the timer was last running.
+        now = Date()
+
         let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             self?.now = Date()
         }

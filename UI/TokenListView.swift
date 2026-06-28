@@ -71,7 +71,12 @@ struct TokenListView: View {
                         }
                     }
                 }
+                // Small right gutter so the overlay scroll indicator doesn't sit on the token
+                // rows. Kept minimal: in "always show scroll bars" mode macOS already reserves
+                // its own lane, so a large value here would double up. (.scrollIndicators would
+                // be cleaner but is macOS 13+; this stays compatible with 11.7.)
                 .padding(.vertical, 2)
+                .padding(.trailing, 2)
             }
         }
     }

@@ -20,6 +20,12 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
 
         if let win = window {
+            // Reuse the open window, but refresh the callback so a stale closure from an
+            // earlier show() can't be invoked.
+            hosting?.rootView = AddTokenSheet(
+                onAddMany: onAddMany,
+                onClose: { [weak self] in self?.window?.close() }
+            )
             NSApp.activate(ignoringOtherApps: true)
             win.makeKeyAndOrderFront(nil)
             return

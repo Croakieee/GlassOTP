@@ -5,6 +5,11 @@ final class OTPStore: ObservableObject {
     @Published private(set) var tokens: [OTPToken] = []
     @Published var query: String = ""
 
+    /// True when the keychain vault exists but can't be decoded (corruption). The data is left
+    /// untouched (never overwritten), and the UI uses this to warn the user to restore a backup
+    /// instead of silently showing blank codes.
+    @Published private(set) var vaultCorrupted: Bool = false
+
     let timer = TimeStepTimer()
 
     // КЕШ СЕКРЕТОВ (добавлено)
@@ -13,10 +18,25 @@ final class OTPStore: ObservableObject {
     // MARK: - Init
 
     init(tokens: [OTPToken] = []) {
-        if tokens.isEmpty {
-            self.tokens = OTPStore.sorted(PersistenceService.load())
-        } else {
+        guard tokens.isEmpty else {
+            // Explicit injection (previews / tests): take as-is, no keychain involvement.
             self.tokens = OTPStore.sorted(tokens)
+            return
+        }
+
+        let loaded = PersistenceService.load()
+        do {
+            // Drop "ghost" tokens whose secret is no longer in the vault (would only render as
+            // dashes). Only when the vault reads cleanly.
+            let ids = try KeychainService.storedSecretIDs()
+            self.tokens = OTPStore.sorted(loaded.filter { ids.contains($0.id.uuidString) })
+        } catch {
+            // Vault unreadable: keep EVERY token (never prune on a transient/failed read), and
+            // flag genuine corruption so the UI can surface it.
+            self.tokens = OTPStore.sorted(loaded)
+            if case KeychainError.decode = error {
+                self.vaultCorrupted = true
+            }
         }
     }
 
@@ -43,7 +63,7 @@ final class OTPStore: ObservableObject {
             secretCache[token.id] = secret
             return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
         } catch {
-            return "------"
+            return String(repeating: "-", count: token.digits)
         }
     }
 
@@ -52,13 +72,6 @@ final class OTPStore: ObservableObject {
     }
 
     // MARK: - Mutations (+ persist)
-
-    func addImported(_ imported: ImportedToken) {
-        try? KeychainService.setSecret(imported.secret, for: imported.token.id)
-        secretCache[imported.token.id] = imported.secret
-        tokens.append(imported.token)
-        commit()
-    }
 
     @discardableResult
     func addImportedMany(_ list: [ImportedToken]) -> Int {
@@ -106,10 +119,16 @@ final class OTPStore: ObservableObject {
                 continue
             }
 
-            try? KeychainService.setSecret(
-                item.secret,
-                for: item.token.id
-            )
+            // Persist the secret first; only count/add the token if it actually stuck.
+            // A failed keychain write must not leave a secret-less "------" token behind.
+            do {
+                try KeychainService.setSecret(
+                    item.secret,
+                    for: item.token.id
+                )
+            } catch {
+                continue
+            }
 
             secretCache[item.token.id] = item.secret
             tokens.append(item.token)
@@ -124,11 +143,6 @@ final class OTPStore: ObservableObject {
         }
 
         return addedCount
-    }
-
-    func add(_ token: OTPToken) {
-        tokens.append(token)
-        commit()
     }
 
     func remove(_ tokenID: UUID) {
@@ -184,8 +198,6 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    static func sampleStore() -> OTPStore { OTPStore(tokens: []) }
-    
     // MARK: - Secret editing
 
     func secret(for token: OTPToken) -> String? {
@@ -218,16 +230,4 @@ final class OTPStore: ObservableObject {
         commit()
     }
 
-    func isDuplicate(_ token: OTPToken, secret: Data) -> Bool {
-        for existing in tokens {
-            if existing.issuer == token.issuer &&
-               existing.account == token.account,
-               let existingSecret = try? KeychainService.getSecret(for: existing.id),
-               existingSecret == secret {
-                return true
-            }
-        }
-        return false
-    }
-    
 }

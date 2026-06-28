@@ -274,11 +274,23 @@ struct AddTokenSheet: View {
             } else {
                 list = [try buildManualImported()]
             }
-            _ = onAddMany(list)
+            // Use the real count returned by the store, not list.count: duplicates (and any
+            // token whose secret failed to persist) are skipped, so list.count would lie.
+            let added = onAddMany(list)
+            let skipped = list.count - added
 
-            withAnimation { addedMessage = "Added \(list.count) token(s)" }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
-            clearAllFields()
+            if added > 0 {
+                var msg = "Added \(added) token(s)"
+                if skipped > 0 { msg += ", \(skipped) skipped" }
+                withAnimation { addedMessage = msg }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
+                clearAllFields()
+            } else {
+                // Nothing added — every token was a duplicate (or couldn't be stored).
+                errorMessage = skipped <= 1
+                    ? "This token already exists."
+                    : "All \(skipped) tokens already exist."
+            }
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -342,20 +354,28 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
-        do {
-            let link = try QRService.scanOtpauth(from: url)
-            self.otpauthText = link
-        } catch {
-            self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        // Vision QR detection can be slow on large images — keep it off the main thread and
+        // hop back only to update @State.
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let link = try QRService.scanOtpauth(from: url)
+                DispatchQueue.main.async { self.otpauthText = link }
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                DispatchQueue.main.async { self.errorMessage = message }
+            }
         }
     }
 
     private func importImage(img: NSImage) {
-        do {
-            let link = try QRService.scanOtpauth(from: img)
-            self.otpauthText = link
-        } catch {
-            self.errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let link = try QRService.scanOtpauth(from: img)
+                DispatchQueue.main.async { self.otpauthText = link }
+            } catch {
+                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                DispatchQueue.main.async { self.errorMessage = message }
+            }
         }
     }
 
