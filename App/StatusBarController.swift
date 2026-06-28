@@ -279,15 +279,27 @@ final class StatusBarController: NSObject {
                     }
 
                 } catch {
+                    // Wrong password / corrupted file: show a modal alert, not a notification —
+                    // the user must see this even if notifications are disabled.
                     DispatchQueue.main.async {
-                        NotificationService.shared.show(
+                        self.showAlert(
                             title: "Import failed",
-                            body: "Wrong password or corrupted file"
+                            text: "Wrong password or corrupted file."
                         )
                     }
                 }
             }
         }
+    }
+
+    /// Modal alert for feedback that must be seen regardless of notification permission.
+    private func showAlert(title: String, text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func askPassword(confirm: Bool = false,
@@ -346,6 +358,19 @@ final class StatusBarController: NSObject {
             if password != (confirmField?.stringValue ?? "") {
                 askPassword(confirm: true, errorText: "Passwords don't match. Try again.", completion: completion)
                 return
+            }
+            // Warn (but allow) on a short password: the backup holds every secret.
+            if password.count < 8 {
+                let warn = NSAlert()
+                warn.messageText = "Weak password"
+                warn.informativeText = "This password is shorter than 8 characters. The backup contains all your secrets. Use it anyway?"
+                warn.addButton(withTitle: "Change")      // default — the safer choice
+                warn.addButton(withTitle: "Use anyway")
+                NSApp.activate(ignoringOtherApps: true)
+                if warn.runModal() == .alertFirstButtonReturn {
+                    askPassword(confirm: true, completion: completion)
+                    return
+                }
             }
         }
 

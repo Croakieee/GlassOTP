@@ -5,6 +5,11 @@ final class OTPStore: ObservableObject {
     @Published private(set) var tokens: [OTPToken] = []
     @Published var query: String = ""
 
+    /// True when the keychain vault exists but can't be decoded (corruption). The data is left
+    /// untouched (never overwritten), and the UI uses this to warn the user to restore a backup
+    /// instead of silently showing blank codes.
+    @Published private(set) var vaultCorrupted: Bool = false
+
     let timer = TimeStepTimer()
 
     // КЕШ СЕКРЕТОВ (добавлено)
@@ -13,21 +18,26 @@ final class OTPStore: ObservableObject {
     // MARK: - Init
 
     init(tokens: [OTPToken] = []) {
-        if tokens.isEmpty {
-            self.tokens = OTPStore.sorted(OTPStore.dropOrphans(PersistenceService.load()))
-        } else {
+        guard tokens.isEmpty else {
             // Explicit injection (previews / tests): take as-is, no keychain involvement.
             self.tokens = OTPStore.sorted(tokens)
+            return
         }
-    }
 
-    /// Drops persisted tokens whose secret is no longer in the keychain ("ghosts" that would
-    /// only ever render as "------"). Safe by construction: if the vault can't be read
-    /// (corruption / locked keychain) `storedSecretIDs()` throws and we keep EVERY token, so a
-    /// transient failure never wipes the list.
-    private static func dropOrphans(_ arr: [OTPToken]) -> [OTPToken] {
-        guard let ids = try? KeychainService.storedSecretIDs() else { return arr }
-        return arr.filter { ids.contains($0.id.uuidString) }
+        let loaded = PersistenceService.load()
+        do {
+            // Drop "ghost" tokens whose secret is no longer in the vault (would only render as
+            // dashes). Only when the vault reads cleanly.
+            let ids = try KeychainService.storedSecretIDs()
+            self.tokens = OTPStore.sorted(loaded.filter { ids.contains($0.id.uuidString) })
+        } catch {
+            // Vault unreadable: keep EVERY token (never prune on a transient/failed read), and
+            // flag genuine corruption so the UI can surface it.
+            self.tokens = OTPStore.sorted(loaded)
+            if case KeychainError.decode = error {
+                self.vaultCorrupted = true
+            }
+        }
     }
 
     // MARK: - Derived
