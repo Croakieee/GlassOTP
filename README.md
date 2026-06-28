@@ -1,64 +1,43 @@
 # GlassOTP
 
-GlassOTP is a lightweight TOTP authenticator for macOS designed to live in your menu bar.
-It allows you to quickly access one-time authentication codes without opening a full application window.
+GlassOTP is a lightweight **TOTP authenticator for macOS** that lives in your menu bar.
+Get your one-time codes instantly — no full application window, no clutter, fully offline.
 
 ![Main UI](screenshots/main1.png)
 
 ## Features
 
-* Menu bar TOTP authenticator for macOS
-* Supports standard `otpauth://` links
-* QR code import from images or camera
-* Manual token entry
-* Secure secret storage using macOS Keychain
-* Touch ID / system password authentication before viewing secrets
-* QR code export for adding tokens to other authenticators
-* Token renaming and editing
-* Token pinning and sorting
-* Automatic copy to clipboard with optional auto-close
-* Real-time countdown timer for each token
-
-## Editing
-
-Tokens can be renamed or edited.
-You may also:
-
-* View the secret key
-* Regenerate the QR code for another authenticator
-
-Both actions require system authentication.
-
-![1 UI](screenshots/11.png)
-
+* Menu bar TOTP authenticator — no Dock icon, always one click away
+* Standard `otpauth://totp/…` links
+* Google Authenticator export (`otpauth-migration://…`) — import many tokens at once
+* QR code import from an image (file, drag & drop, or clipboard) or live camera
+* Manual entry (issuer, account, Base32 secret, digits, period, algorithm)
+* SHA1 / SHA256 / SHA512, 6- or 8-digit codes, custom period
+* Secrets stored in the **macOS Keychain** — never in plain text on disk
+* Optional **Touch ID / password lock** before codes are shown
+* Encrypted, password-protected backup & restore
+* QR export to move a token to another authenticator
+* Rename, pin, search, and sort tokens
+* One-click copy with a real-time countdown ring and optional auto-close
 
 ## Security
 
-GlassOTP stores all token secrets inside the **macOS Keychain**.
-Secrets are never stored in plain text on disk.
+* All token secrets are stored in the **macOS Keychain**, never as plain text on disk.
+* GlassOTP makes **no network connections** — it does not sync, transmit, or upload anything. All data stays on your device.
+* Sensitive actions require system authentication (**Touch ID** or your macOS password):
+  * Viewing or editing a secret key
+  * Showing a token's QR code
+* An optional **"Require Touch ID to view"** lock hides all codes until you authenticate.
+* Authentication is cached briefly to avoid repeated prompts during a session.
+* Backups are encrypted with **AES-GCM** using a key derived from your password (**PBKDF2-HMAC-SHA256**). Without the password, a backup file cannot be read.
 
-Sensitive actions such as:
-
-* Viewing a secret key
-* Displaying a token QR code
-
-require authentication via:
-
-* Touch ID
-* macOS user password
-
-Authentication is cached briefly to avoid repeated prompts.
-
-GlassOTP does not transmit, sync, or upload your secrets.
-
-The application does not use any network connections and operates fully offline.
-All data remains stored locally on your device.
+> The backup file contains all your secrets. Choose a strong password — GlassOTP will warn you if it's too short.
 
 ## System Requirements
 
 * macOS 11.7 or newer
 * Apple Silicon or Intel Mac
-* Camera access (optional, for QR scanning)
+* Camera access (optional, only for live QR scanning)
 
 ## Installation
 
@@ -66,140 +45,93 @@ All data remains stored locally on your device.
 2. Extract the ZIP file.
 3. Move `GlassOTP.app` into your **Applications** folder.
 
-## First Launch
+## First Launch (Gatekeeper)
 
-Because the application is not signed by an Apple developer certificate, macOS Gatekeeper may block it.
+The app is not distributed with an Apple Developer certificate, so macOS Gatekeeper may block the first launch or show:
 
-To launch the application:
+> "The application is damaged and can't be opened. You should move it to the Trash."
 
-1. Hold "Control" and right-click on `GlassOTP.app`
-2. Select **Open**
-3. Click **Open** again in the dialog window
+This is a quarantine flag added to files downloaded from the internet — not actual damage.
 
-After this, macOS will allow the application to run normally.
+**Recommended (manual) fix** — run once in Terminal:
 
-## macOS Security Warning
-
-On newer macOS versions you may see a warning similar to:
-
-"The application is damaged and can’t be opened. You should move it to the Trash."
-
-This can happen for two different reasons depending on the protection mechanism:
-
-* **Gatekeeper quarantine attributes** applied to files downloaded from the internet
-* **System integrity checks** detecting potential modification or unverified content
-
-### Sentinel
-
-`Sentinel` helps remove macOS quarantine attributes that prevent the application from launching. ( For MacOS from 13.x.x )
-
-Use it if the app is blocked immediately after download.
-
-### AutoFix
-
-`AutoFix` resolves issues when macOS flags the application as damaged or unsafe. ( Works with MacOS under 13.x.x without Sentinel patching )
-
-This typically occurs when the system believes the app has been modified or contains suspicious content.
-
-Use AutoFix if you see a prompt suggesting to move the application to Trash.
-
-After applying the appropriate fix, the application should launch without warnings.
-
-
-## AutoFix Utility
-
-The repository includes a helper tool named **AutoFix.app**.
-
-[![Thanks to Appstorrent](https://img.shields.io/badge/Thanks-Appstorrent-blue?style=flat-square)](https://appstorrent.ru/200-mistakes.html)
-
-For the first installation likely you need to unlock AutoFix through =>
-
-[![Use Sentinel](https://img.shields.io/badge/%20Use-Sentinel-2ea44f?style=for-the-badge&logo=github)](https://github.com/alienator88/Sentinel)
-
-Sentinel removes macOS quarantine attributes (`com.apple.quarantine`) that are applied to files downloaded from the internet.
-
-AutoFix addresses cases where macOS flags the application as damaged by fixing permissions and removing problematic attributes.
-
-### Using AutoFix
-
-1. Launch `AutoFix.app`
-2. If macOS blocks it, right-click and choose **Open**
-3. Select `GlassOTP.app`
-4. Run the fix
-
-### What AutoFix Does
-
-AutoFix executes the following commands with elevated privileges:
-
-```
-xattr -c -r
-xattr -r -d
-chmod +x
-chown -R $USER
-chmod -R 777
+```sh
+xattr -r -c /Applications/GlassOTP.app
 ```
 
-These commands:
+Then open the app normally (or Control-click → **Open** the first time).
 
-* Remove extended macOS quarantine attributes
-* Fix executable permissions
-* Ensure the application can launch properly
+**Optional helper tools** (third-party, not bundled with GlassOTP):
 
-## Manual Fix
-
-If you prefer not to use AutoFix, you can run the command manually:
-
-```
-sudo xattr -r -c /Applications/GlassOTP.app
-```
+* [Sentinel](https://github.com/alienator88/Sentinel) — removes the `com.apple.quarantine` attribute (macOS 13+).
+* AutoFix — clears quarantine attributes and fixes permissions on older systems.
 
 ## Usage
 
-Once launched, GlassOTP appears in the macOS menu bar.
-Then tap + on top left corner.
-From the menu you can:
+GlassOTP runs from the macOS menu bar.
 
-![2 UI](screenshots/2.png)
-![5 UI](screenshots/55.png)
+* **Left-click** the icon — open the token list.
+* **Right-click** the icon — open the quick menu: **Open**, **Export**, **Import**, **Delete All**, **Pin popover**, **Exit**.
 
-* Add new tokens
-* Scan QR codes
-* Import `otpauth://` links
-* Copy authentication codes
-* Manage existing tokens
-* Create backup file of OTP keys or import already made file
+![Quick menu](screenshots/4.png)
 
-## Token Management
+In the token list you can search, copy codes (just click a row), and add new tokens with the **+** button.
 
-GlassOTP supports several ways to add tokens:
+![Token list](screenshots/55.png)
 
-### QR Code Import
+### Adding tokens
 
-Drag a QR image into the import window or scan using your Mac camera.
+Press **+** in the top-right corner. You can add tokens in several ways:
 
-### otpauth Links
+* **QR code** — drag an image with a QR code onto the window, pick an image file, paste from the clipboard, or **scan with the camera**.
+* **otpauth link** — paste an `otpauth://totp/…` URL.
+* **Google Authenticator export** — paste an `otpauth-migration://…` link to import multiple tokens at once.
+* **Manual entry** — fill in the fields by hand:
 
-Paste an `otpauth://` URL exported from another authenticator.
+![Add token](screenshots/2.png)
 
-### Manual Entry
+  * Issuer
+  * Account
+  * Secret (Base32)
+  * Digits (6 or 8)
+  * Period (seconds)
+  * Algorithm (SHA1 / SHA256 / SHA512)
 
-Manually enter:
+![Manual entry](screenshots/3.png)
 
-![3 UI](screenshots/3.png)
+Duplicate tokens are detected automatically and skipped on import.
 
-* Issuer
-* Account
-* Secret key (Base32)
-* Algorithm
-* Code length
-* Period
+### Managing tokens
 
-## Right-clicking
+Right-click any token for quick actions:
 
-Right-clicking the menu bar icon opens a context menu that provides quick access to core actions.
+* **Pin / Unpin** — keep important tokens at the top
+* **Rename** — change the issuer or account label
+* **Show QR code** — regenerate a QR to add the token to another authenticator *(requires authentication)*
+* **Show / edit secret** — view or replace the Base32 secret *(requires authentication)*
+* **Delete** — remove the token and its secret from the Keychain
 
-![4 UI](screenshots/4.png)
+![Token actions](screenshots/11.png)
 
+### Backup & restore
+
+From the **right-click menu**:
+
+* **Export** — choose a location, set a password, and save an encrypted `.glassotp` backup of all tokens.
+* **Import** — select a `.glassotp` file and enter its password. Existing tokens are skipped, new ones are added.
+
+### Settings
+
+Open the **settings menu** (slider icon) in the token list:
+
+* **Close after copy** — automatically close the popover shortly after copying a code.
+* **Require Touch ID to view** — lock the list until you authenticate.
+
+## Notes & Limitations
+
+* GlassOTP supports **TOTP only** (time-based codes). HOTP (counter-based) tokens are not generated.
+* Code length is limited to **6 or 8 digits**.
+* Status messages (export/import/delete) use macOS notifications. If notifications are disabled for GlassOTP, the app shows a small in-app notice, and import errors are shown as a dialog.
 
 ## Building from Source
 
@@ -208,9 +140,7 @@ Requirements:
 * Xcode 14+
 * Swift 5.7+
 
-Clone the repository:
-
-```
+```sh
 git clone https://github.com/Croakieee/GlassOTP.git
 ```
 
@@ -219,15 +149,14 @@ Open the project in Xcode and build normally.
 ## Contributing
 
 Pull requests and improvements are welcome.
-
-If you discover a bug or have a feature request, please open an issue.
+If you find a bug or have a feature request, please open an issue.
 
 ## Disclaimer
 
-GlassOTP is an open source project provided without warranty.
-Use it at your own risk.
+GlassOTP is an open source project provided without warranty. Use it at your own risk.
+For maximum security, always keep recovery/backup codes for your accounts.
 
-For maximum security, always keep backup codes for your accounts.
+See [LICENSE](LICENSE) for license terms.
 
 ## ☕ Support the Project
 
