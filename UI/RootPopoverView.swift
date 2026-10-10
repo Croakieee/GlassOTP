@@ -69,12 +69,12 @@ struct RootPopoverView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Spacer(minLength: 0)
         }
         // Snug padding: close to the rounded edges but with a little breathing room.
+        // No bottom padding: the list runs to the popover's bottom edge so a partially
+        // visible row hints that there is more to scroll.
         .padding(.horizontal, 6)
         .padding(.top, 8)
-        .padding(.bottom, 6)
         // Single rounded card that fills the popover: content + material are clipped to the
         // same shape, so the token area follows the rounded contour instead of square corners,
         // and there's no inset ring doubling the border.

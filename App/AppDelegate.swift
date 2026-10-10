@@ -10,6 +10,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 
+        // The login item runs the executable directly, which bypasses LaunchServices' own
+        // single-instance check. If an older copy is already running, quit this one so there
+        // is never a second status-bar icon.
+        if let bundleID = Bundle.main.bundleIdentifier {
+            let me = NSRunningApplication.current
+            let olderExists = NSRunningApplication
+                .runningApplications(withBundleIdentifier: bundleID)
+                .contains { other in
+                    guard other.processIdentifier != me.processIdentifier else { return false }
+                    if let a = other.launchDate, let b = me.launchDate, a != b { return a < b }
+                    return other.processIdentifier < me.processIdentifier
+                }
+            if olderExists {
+                NSApp.terminate(nil)
+                return
+            }
+        }
+
         NSApp.setActivationPolicy(.accessory)
 
         UNUserNotificationCenter.current().delegate = NotificationService.shared

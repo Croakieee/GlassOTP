@@ -157,6 +157,10 @@ final class StatusBarController: NSObject {
         pinItem.state = appState.pinPopover ? .on : .off
         menu.addItem(pinItem)
 
+        let loginItem = item("Launch at login", #selector(toggleLaunchAtLogin))
+        loginItem.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(loginItem)
+
         menu.addItem(.separator())
 
         menu.addItem(item("Exit", #selector(exitApp)))
@@ -174,6 +178,14 @@ final class StatusBarController: NSObject {
 
     @objc private func togglePin() {
         appState.pinPopover.toggle()
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            try LoginItem.setEnabled(!LoginItem.isEnabled)
+        } catch {
+            showAlert(title: "Couldn't change launch at login", text: error.localizedDescription)
+        }
     }
 
     @objc private func exitApp() {
