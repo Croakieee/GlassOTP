@@ -19,6 +19,7 @@ Get your one-time codes instantly — no full application window, no clutter, fu
 * QR export to move a token to another authenticator
 * Rename, pin, search, and sort tokens
 * One-click copy with a real-time countdown ring and optional auto-close
+* Optional launch at login
 
 ## Security
 
@@ -71,7 +72,7 @@ Then open the app normally (or Control-click → **Open** the first time).
 GlassOTP runs from the macOS menu bar.
 
 * **Left-click** the icon — open the token list.
-* **Right-click** the icon — open the quick menu: **Open**, **Export**, **Import**, **Delete All**, **Pin popover**, **Exit**.
+* **Right-click** the icon — open the quick menu: **Open**, **Export**, **Import**, **Delete All**, **Pin popover**, **Launch at login**, **Exit**.
 
 ![Quick menu](screenshots/4.png)
 
@@ -126,6 +127,10 @@ Open the **settings menu** (slider icon) in the token list:
 
 * **Close after copy** — automatically close the popover shortly after copying a code.
 * **Require Touch ID to view** — lock the list until you authenticate.
+
+In the **right-click menu**:
+
+* **Launch at login** — start GlassOTP automatically when you log in. Enable it from the copy in your **Applications** folder; if you move the app later, turn the option on again.
 
 ## Notes & Limitations
 
