@@ -13,6 +13,12 @@ final class StatusBarController: NSObject {
 
     private var autoCloseWork: DispatchWorkItem?
     private static let autoCloseDelay: TimeInterval = 2.0
+    private static let keyboardCopyCloseDelay: TimeInterval = 0.35
+
+    private var hotKey: GlobalHotKey?
+    private var hotKeyCancellable: AnyCancellable?
+    private var keyMonitor: Any?
+    private var appToRestore: NSRunningApplication?
 
     init(popover: NSPopover, store: OTPStore) {
         self.popover = popover
@@ -50,6 +56,13 @@ final class StatusBarController: NSObject {
 
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(handleKeyboardCopy),
+            name: .keyboardCopyDone,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(suspendAutoClose),
             name: .lockAuthBegan,
             object: nil
@@ -74,23 +87,38 @@ final class StatusBarController: NSObject {
         }
 
         applyPinBehavior(pinned: appState.pinPopover)
+
+        hotKeyCancellable = appState.$globalHotKeyEnabled.sink { [weak self] enabled in
+            self?.setHotKey(enabled: enabled)
+        }
     }
 
     deinit {
         if let monitor = eventMonitor { NSEvent.removeMonitor(monitor) }
+        removeKeyMonitor()
         cancellable?.cancel()
+        hotKeyCancellable?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 
     @objc private func handleAutoClose() {
         guard !appState.pinPopover else { return }
+        scheduleClose(after: Self.autoCloseDelay)
+    }
+
+    @objc private func handleKeyboardCopy() {
+        guard !appState.pinPopover else { return }
+        scheduleClose(after: Self.keyboardCopyCloseDelay)
+    }
+
+    private func scheduleClose(after delay: TimeInterval) {
         cancelAutoClose()
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.popover.isShown else { return }
             self.closePopover(sender: nil)
         }
         autoCloseWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autoCloseDelay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     private func cancelAutoClose() {
@@ -117,7 +145,56 @@ final class StatusBarController: NSObject {
     @objc private func handlePopoverDidClose() {
         store.timer.pause()
         cancelAutoClose()
+        removeKeyMonitor()
+        restorePreviousApp()
         NotificationCenter.default.post(name: .popoverDidClose, object: nil)
+    }
+
+    private func setHotKey(enabled: Bool) {
+        hotKey = nil
+        guard enabled else { return }
+        hotKey = GlobalHotKey.optionCommandO { [weak self] in
+            self?.toggleFromHotKey()
+        }
+    }
+
+    private func toggleFromHotKey() {
+        if popover.isShown {
+            closePopover(sender: nil)
+            return
+        }
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        let isSelf = frontmost?.processIdentifier == NSRunningApplication.current.processIdentifier
+        appToRestore = isSelf ? nil : frontmost
+        NSApp.activate(ignoringOtherApps: true)
+        showPopover(sender: nil, viaHotKey: true)
+    }
+
+    private func restorePreviousApp() {
+        guard let app = appToRestore else { return }
+        appToRestore = nil
+        let hasOwnWindowOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+        guard NSApp.isActive, !hasOwnWindowOpen else { return }
+        app.activate(options: [])
+    }
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  event.window === self.popover.contentViewController?.view.window,
+                  event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+                  let command = PopoverKeyCommand(keyCode: event.keyCode)
+            else { return event }
+            NotificationCenter.default.post(name: .popoverKeyCommand, object: command)
+            return nil
+        }
+    }
+
+    private func removeKeyMonitor() {
+        guard let monitor = keyMonitor else { return }
+        NSEvent.removeMonitor(monitor)
+        keyMonitor = nil
     }
 
     // MARK: - Click handling
@@ -453,11 +530,12 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func showPopover(sender: Any?) {
+    private func showPopover(sender: Any?, viaHotKey: Bool = false) {
         guard let button = statusItem.button else { return }
 
         cancelAutoClose()
         store.timer.resume()
+        installKeyMonitor()
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
@@ -465,7 +543,11 @@ final class StatusBarController: NSObject {
 
         // Re-evaluate the lock each time the popover opens (NSPopover doesn't reliably
         // re-fire SwiftUI .onAppear on subsequent shows).
-        NotificationCenter.default.post(name: .popoverDidShow, object: nil)
+        NotificationCenter.default.post(
+            name: .popoverDidShow,
+            object: nil,
+            userInfo: [PopoverUserInfo.openedViaHotKey: viaHotKey]
+        )
     }
 
     private func closePopover(sender: Any?) {

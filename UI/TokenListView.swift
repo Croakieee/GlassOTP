@@ -13,6 +13,8 @@ struct TokenListView: View {
     @ObservedObject var timer: TimeStepTimer
     @Binding var autoCloseOnCopy: Bool
     let playsCopySound: Bool
+    let selectedID: UUID?
+    let keyboardCopiedID: UUID?
 
     @State private var contentFrame: CGRect = .zero
 
@@ -43,16 +45,21 @@ struct TokenListView: View {
             }
         } else {
             GeometryReader { viewport in
+            ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 10) {
                     ForEach(items) { token in
+                        let remaining = store.remaining(for: token)
                         TokenRowView(
                             title: token.displayTitle,
                             code: store.code(for: token),
+                            nextCode: remaining <= TokenRowView.nextCodeThreshold ? store.nextCode(for: token) : nil,
                             digits: token.digits,
-                            remaining: store.remaining(for: token),
+                            remaining: remaining,
                             period: token.period,
-                            playsSound: playsCopySound
+                            playsSound: playsCopySound,
+                            isSelected: token.id == selectedID,
+                            copiedExternally: token.id == keyboardCopiedID
                         ) {
                             if autoCloseOnCopy {
                                 NotificationCenter.default.post(name: .autoClosePopover, object: nil)
@@ -81,6 +88,7 @@ struct TokenListView: View {
                                 onDelete(token.id)
                             }
                         }
+                        .id(token.id)
                     }
                 }
                 .padding(.top, 2)
@@ -101,6 +109,13 @@ struct TokenListView: View {
                 scrollIndicator(viewportHeight: viewport.size.height),
                 alignment: .topTrailing
             )
+            .onChange(of: selectedID) { id in
+                guard let id else { return }
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    proxy.scrollTo(id)
+                }
+            }
+            }
             }
         }
     }

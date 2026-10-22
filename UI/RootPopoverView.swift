@@ -38,6 +38,10 @@ struct RootPopoverView: View {
 
     @State private var notificationsDenied: Bool = false
 
+    @State private var keyboardActive: Bool = false
+    @State private var selectedID: UUID?
+    @State private var keyboardCopiedID: UUID?
+
     var body: some View {
 
         VStack(alignment: .leading, spacing: 8) {
@@ -55,6 +59,8 @@ struct RootPopoverView: View {
                     timer: store.timer,
                     autoCloseOnCopy: $appState.autoCloseOnCopy,
                     playsCopySound: appState.playSoundOnCopy,
+                    selectedID: highlightedID,
+                    keyboardCopiedID: keyboardCopiedID,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
@@ -85,12 +91,27 @@ struct RootPopoverView: View {
             applyLockOnOpen()
             refreshNotificationStatus()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
             applyLockOnOpen()
             refreshNotificationStatus()
+            keyboardActive = note.userInfo?[PopoverUserInfo.openedViaHotKey] as? Bool ?? false
+            selectedID = store.filteredTokens().first?.id
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .popoverKeyCommand)) { note in
+            guard let command = note.object as? PopoverKeyCommand else { return }
+            handleKey(command)
+        }
+        .onChange(of: store.query) { query in
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                keyboardActive = true
+            }
+            selectedID = store.filteredTokens().first?.id
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
             store.query = ""
+            keyboardActive = false
+            selectedID = nil
+            keyboardCopiedID = nil
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
@@ -179,6 +200,7 @@ struct RootPopoverView: View {
             Menu {
                 Toggle("Close after copy", isOn: $appState.autoCloseOnCopy)
                 Toggle("Play sound on copy", isOn: $appState.playSoundOnCopy)
+                Toggle("Global shortcut ⌥⌘O", isOn: $appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
             } label: {
                 Image(systemName: "slider.horizontal.3")
@@ -381,6 +403,51 @@ struct RootPopoverView: View {
     }
 
     // MARK: Actions
+
+    private var highlightedID: UUID? {
+        guard keyboardActive else { return nil }
+        let items = store.filteredTokens()
+        if let selectedID, items.contains(where: { $0.id == selectedID }) {
+            return selectedID
+        }
+        return items.first?.id
+    }
+
+    private func handleKey(_ command: PopoverKeyCommand) {
+        guard showContent else {
+            if command == .enter { promptUnlock() }
+            return
+        }
+        let items = store.filteredTokens()
+        guard !items.isEmpty else { return }
+        guard keyboardActive else {
+            keyboardActive = true
+            selectedID = items.first?.id
+            return
+        }
+
+        let current = items.firstIndex { $0.id == highlightedID } ?? 0
+        switch command {
+        case .up:
+            selectedID = items[max(current - 1, 0)].id
+        case .down:
+            selectedID = items[min(current + 1, items.count - 1)].id
+        case .enter:
+            copyWithKeyboard(items[current])
+        }
+    }
+
+    private func copyWithKeyboard(_ token: OTPToken) {
+        guard let code = store.code(for: token) else { return }
+        CodeClipboard.copy(code, playSound: appState.playSoundOnCopy)
+        keyboardCopiedID = token.id
+        NotificationCenter.default.post(name: .keyboardCopyDone, object: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if keyboardCopiedID == token.id {
+                keyboardCopiedID = nil
+            }
+        }
+    }
 
     private func beginRename(_ id: UUID) {
 

@@ -69,13 +69,25 @@ final class OTPStore: ObservableObject {
     }
 
     func code(for token: OTPToken) -> String? {
-        if let cached = secretCache[token.id] {
-            return TOTPGenerator.code(for: timer.now, token: token, secret: cached)
-        }
+        code(for: token, at: timer.now)
+    }
 
+    func nextCode(for token: OTPToken) -> String? {
+        code(for: token, at: timer.now.addingTimeInterval(TimeInterval(token.period)))
+    }
+
+    private func code(for token: OTPToken, at date: Date) -> String? {
+        guard let secret = cachedSecret(of: token) else { return nil }
+        return TOTPGenerator.code(for: date, token: token, secret: secret)
+    }
+
+    private func cachedSecret(of token: OTPToken) -> Data? {
+        if let cached = secretCache[token.id] {
+            return cached
+        }
         guard let secret = try? KeychainService.getSecret(for: token.id) else { return nil }
         secretCache[token.id] = secret
-        return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
+        return secret
     }
 
     func remaining(for token: OTPToken) -> Int {

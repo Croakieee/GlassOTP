@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     private let autoCloseKey = "GlassOTP.autoCloseOnCopy"
     private let requireUnlockKey = "GlassOTP.requireUnlock"
     private let copySoundKey = "GlassOTP.playSoundOnCopy"
+    private let globalHotKeyKey = "GlassOTP.globalHotKey"
 
     @Published var pinPopover: Bool {
         didSet { UserDefaults.standard.set(pinPopover, forKey: pinKey) }
@@ -27,12 +28,17 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(playSoundOnCopy, forKey: copySoundKey) }
     }
 
+    @Published var globalHotKeyEnabled: Bool {
+        didSet { UserDefaults.standard.set(globalHotKeyEnabled, forKey: globalHotKeyKey) }
+    }
+
     private init() {
         self.pinPopover = UserDefaults.standard.bool(forKey: pinKey)
         // Default ON to preserve existing behaviour; `object(forKey:)` distinguishes "unset" from "false".
         self.autoCloseOnCopy = UserDefaults.standard.object(forKey: autoCloseKey) as? Bool ?? true
         self.requireUnlock = UserDefaults.standard.object(forKey: requireUnlockKey) as? Bool ?? false
         self.playSoundOnCopy = UserDefaults.standard.object(forKey: copySoundKey) as? Bool ?? true
+        self.globalHotKeyEnabled = UserDefaults.standard.object(forKey: globalHotKeyKey) as? Bool ?? true
     }
 }
 

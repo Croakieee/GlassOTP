@@ -18,6 +18,7 @@
 		CEA2FCC42E97035A00FA6D87 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCC32E97035A00FA6D87 /* ContentView.swift */; };
 		CEA2FCC92E97035E00FA6D87 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEA2FCC82E97035E00FA6D87 /* Preview Assets.xcassets */; };
 		CEA2FCD22E9703AD00FA6D87 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */; };
+		CD9D904A352340559BDB6D36 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */; };
 		CEA2FCD42E9703C000FA6D87 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */; };
 		CEA2FCD62E9703DC00FA6D87 /* SceneCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD52E9703DC00FA6D87 /* SceneCoordinator.swift */; };
 		CEA2FCD92E97040100FA6D87 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD82E97040100FA6D87 /* VisualEffectBackground.swift */; };
@@ -59,6 +60,7 @@
 		CEA2FCC82E97035E00FA6D87 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		CEA2FCCA2E97035E00FA6D87 /* GlassOTP.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GlassOTP.entitlements; sourceTree = "<group>"; };
 		CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
 		CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		CEA2FCD52E9703DC00FA6D87 /* SceneCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoordinator.swift; sourceTree = "<group>"; };
 		CEA2FCD82E97040100FA6D87 /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
@@ -141,6 +143,7 @@
 			children = (
 				CEA2FCC12E97035A00FA6D87 /* GlassOTPApp.swift */,
 				CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */,
+				086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */,
 				CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */,
 				CEA2FCD52E9703DC00FA6D87 /* SceneCoordinator.swift */,
 			);
@@ -280,6 +283,7 @@
 				CEA2FCE22E97052D00FA6D87 /* TOTPGenerator.swift in Sources */,
 				CEA2FCE72E97056200FA6D87 /* HMAC.swift in Sources */,
 				CEA2FCD22E9703AD00FA6D87 /* AppDelegate.swift in Sources */,
+				CD9D904A352340559BDB6D36 /* GlobalHotKey.swift in Sources */,
 				CEA2FD002E97145F00FA6D87 /* OtpauthMigrationDecoder.swift in Sources */,
 				CEA2FCF82E970C1C00FA6D87 /* PersistenceService.swift in Sources */,
 				CEA2FCFC2E9711A100FA6D87 /* QRService.swift in Sources */,

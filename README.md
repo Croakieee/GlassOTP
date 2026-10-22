@@ -19,6 +19,8 @@ Get your one-time codes instantly — no full application window, no clutter, fu
 * QR export to move a token to another authenticator
 * Rename, pin, search, and sort tokens
 * One-click copy with a real-time countdown ring and optional auto-close
+* **Next code preview** in the last seconds of a period — copy it without waiting for the timer
+* **Keyboard-first**: open with **⌥⌘O** from any app, type to search, **↑/↓** to select, **Enter** to copy
 * Optional launch at login
 
 ## Security
@@ -82,6 +84,19 @@ In the token list you can search, copy codes (just click a row), and add new tok
 
 ![Token list](screenshots/55.png)
 
+### Next code
+
+In the last 5 seconds of a period, the next code appears next to the current one. Click it to copy it right away instead of waiting for the countdown — most services also accept the neighbouring code.
+
+### Keyboard
+
+* **⌥⌘O** — open or close GlassOTP from any app.
+* **Type** to search — the first match is selected.
+* **↑ / ↓** — move the selection.
+* **Enter** — copy the selected code. The window closes and you're back in the app you came from, so you can paste with **⌘V** right away.
+
+![Keyboard search](screenshots/keyboard.png)
+
 ### Adding tokens
 
 Press **+** in the top-right corner. You can add tokens in several ways:
@@ -130,6 +145,7 @@ Open the **settings menu** (slider icon) in the token list:
 
 * **Close after copy** — automatically close the popover shortly after copying a code (a pinned popover stays open).
 * **Play sound on copy** — play a short sound when a code is copied.
+* **Global shortcut ⌥⌘O** — turn the shortcut off if it conflicts with another app.
 * **Require Touch ID to view** — lock the list until you authenticate.
 
 In the **right-click menu**:
