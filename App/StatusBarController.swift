@@ -327,7 +327,7 @@ final class StatusBarController: NSObject {
     private func performExport() {
         let store = self.store
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "backup.glassotp"
+        panel.nameFieldStringValue = "backup"
         panel.allowedFileTypes = ["glassotp"]
         panel.isExtensionHidden = false
 

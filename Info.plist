@@ -4,5 +4,25 @@
 <dict>
 	<key>NSCameraUseContinuityCameraDeviceType</key>
 	<true/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.glassotp.backup</string>
+			<key>UTTypeDescription</key>
+			<string>GlassOTP Backup</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>glassotp</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
