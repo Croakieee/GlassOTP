@@ -10,6 +10,7 @@ enum AddMode: String, CaseIterable {
 struct AddTokenSheet: View {
     let onAddMany: ([ImportedToken]) -> ImportResult
     let onClose: () -> Void
+    var onModeChange: (AddMode) -> Void = { _ in }
 
     @State private var mode: AddMode = .otpauth
 
@@ -23,9 +24,9 @@ struct AddTokenSheet: View {
     @State private var issuer: String = ""
     @State private var account: String = ""
     @State private var secretBase32: String = ""
-    @State private var digits: String = "6"
+    @State private var digits: Int = 6
     @State private var period: String = "30"
-    @State private var algorithmIndex: Int = 0 // 0:SHA1 1:SHA256 2:SHA512
+    @State private var algorithm: OTPAlgorithm = .sha1
 
     @State private var errorMessage: String?
     @State private var isDropping: Bool = false
@@ -37,21 +38,14 @@ struct AddTokenSheet: View {
     @State private var addedMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "qrcode.viewfinder")
-                    .foregroundColor(.accentColor)
-                Text("Add token(s)")
-                    .font(.title3).fontWeight(.semibold)
-                Spacer()
-            }
-
-            Picker("Mode", selection: $mode) {
+        VStack(alignment: .leading, spacing: 18) {
+            Picker("", selection: $mode) {
                 ForEach(AddMode.allCases, id: \.self) { m in
                     Text(m.rawValue).tag(m)
                 }
             }
             .pickerStyle(SegmentedPickerStyle())
+            .labelsHidden()
 
             if mode == .otpauth {
                 otpauthBlock
@@ -59,30 +53,13 @@ struct AddTokenSheet: View {
                 manualFields
             }
 
-            if let err = errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle").foregroundColor(.orange)
-                    Text(err).foregroundColor(.orange).font(.footnote)
-                }
-            }
+            Spacer(minLength: 0)
 
-            if let msg = addedMessage {
-                HStack {
-                    Image(systemName: "checkmark.seal.fill").foregroundColor(.green)
-                    Text(msg).font(.footnote).foregroundColor(.green)
-                }
-                .transition(.opacity)
-            }
-
-            HStack {
-                Spacer()
-                Button("Add") { addAction() }
-                    .keyboardShortcut(.return)
-                    .disabled(!canSubmit)
-            }
-            .padding(.top, 2)
+            footer
         }
-        .padding(18)
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: mode) { onModeChange($0) }
         .sheet(isPresented: $showCameraScanner) {
             CameraSheetView(
                 selectedCameraID: $selectedCameraID,
@@ -95,57 +72,98 @@ struct AddTokenSheet: View {
         }
     }
 
-    private var otpauthBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Paste an otpauth://… or otpauth-migration://… link (Google Authenticator export). Or drag and drop an image/screenshot with a QR code here.")
+    private var footer: some View {
+        HStack(spacing: 10) {
+            statusMessage
+            Spacer(minLength: 12)
+            Button("Close", action: onClose)
+                .keyboardShortcut(.cancelAction)
+            Button("Add", action: addAction)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSubmit)
+        }
+    }
+
+    @ViewBuilder
+    private var statusMessage: some View {
+        if let err = errorMessage {
+            Label(err, systemImage: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
                 .font(.footnote)
-                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let msg = addedMessage {
+            Label(msg, systemImage: "checkmark.seal.fill")
+                .foregroundColor(.green)
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(.opacity)
+        }
+    }
 
-            TextEditor(text: $otpauthText)
-                .font(.system(size: 12, weight: .regular, design: .monospaced))
-                .frame(minHeight: 84)
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
-
+    private var otpauthBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
             dropZone
 
             HStack(spacing: 8) {
-                Button(action: importFromImageFile) {
-                    Label("Select image…", systemImage: "folder")
-                }
-                Button(action: importFromClipboard) {
-                    Label("Paste from clipboard", systemImage: "doc.on.clipboard")
-                }
-                Button(action: { startCameraScanner() }) {
-                    Label("Scan with camera", systemImage: "camera")
-                }
-                Spacer()
-                Button(action: pasteFromClipboardIfText) {
-                    Label("Paste link", systemImage: "link")
-                }
+                sourceButton("Choose Image…", systemImage: "photo", action: importFromImageFile)
+                sourceButton("Paste", systemImage: "doc.on.clipboard", action: importFromClipboard)
+                sourceButton("Scan with Camera", systemImage: "camera", action: startCameraScanner)
             }
+
+            labeled("Link") {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $otpauthText)
+                        .font(.system(size: 12, weight: .regular, design: .monospaced))
+                        .frame(height: 64)
+
+                    if otpauthText.isEmpty {
+                        Text("otpauth://totp/… or otpauth-migration://…")
+                            .font(.system(size: 12, weight: .regular, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 5)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .padding(6)
+                .background(fieldBackground)
+            }
+        }
+    }
+
+    private func sourceButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
         }
     }
 
     // MARK: - Drop zone
 
     private var dropZone: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isDropping ? Color.accentColor.opacity(0.15) : Color.black.opacity(0.06))
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-
-            VStack(spacing: 6) {
-                Image(systemName: "tray.and.arrow.down")
-                Text("Drag and drop an image with a QR code here")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
-            .padding(12)
+        VStack(spacing: 8) {
+            Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 34, weight: .light))
+                .foregroundColor(isDropping ? .accentColor : .secondary)
+            Text("Drop a QR code image here")
+                .font(.system(size: 13, weight: .semibold))
+            Text("PNG, JPEG, HEIC or a screenshot")
+                .font(.footnote)
+                .foregroundColor(.secondary)
         }
-        .frame(height: 84)
+        .frame(maxWidth: .infinity)
+        .frame(height: 150)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isDropping ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    isDropping ? Color.accentColor : Color.primary.opacity(0.18),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                )
+        )
+        .animation(.easeInOut(duration: 0.15), value: isDropping)
         .onDrop(of: ["public.file-url", "public.tiff", "public.png", "public.jpeg"], isTargeted: $isDropping) { providers -> Bool in
             guard let item = providers.first else { return false }
             var handled = false
@@ -195,72 +213,87 @@ struct AddTokenSheet: View {
     }
 
     private var manualFields: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Issuer").font(.caption).foregroundColor(.secondary)
-                    HStack {
-                        Image(systemName: "building.columns").foregroundColor(.secondary)
-                        TextField("e.g., Google", text: $issuer)
-                            .textFieldStyle(PlainTextFieldStyle())
-                    }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Account").font(.caption).foregroundColor(.secondary)
-                    HStack {
-                        Image(systemName: "at").foregroundColor(.secondary)
-                        TextField("e.g., you@example.com", text: $account)
-                            .textFieldStyle(PlainTextFieldStyle())
-                    }
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                inputField("Issuer", systemImage: "building.columns", placeholder: "e.g. GitHub", text: $issuer)
+                inputField("Account", systemImage: "at", placeholder: "e.g. you@example.com", text: $account)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Secret (Base32)").font(.caption).foregroundColor(.secondary)
-                HStack {
-                    Image(systemName: "key").foregroundColor(.secondary)
-                    TextField("e.g., JBSWY3DPEHPK3PXP", text: $secretBase32)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .font(.system(.body, design: .monospaced))
-                }
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
-            }
+            inputField("Secret (Base32)", systemImage: "key", placeholder: "e.g. JBSWY3DPEHPK3PXP", text: $secretBase32, monospaced: true)
 
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Digits").font(.caption).foregroundColor(.secondary)
-                    TextField("6 or 8", text: $digits)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .frame(width: 80)
-                        .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
+            HStack(alignment: .top, spacing: 12) {
+                labeled("Digits") {
+                    Picker("", selection: $digits) {
+                        Text("6").tag(6)
+                        Text("8").tag(8)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .labelsHidden()
+                    .frame(width: 110)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Period (sec.)").font(.caption).foregroundColor(.secondary)
-                    TextField("Typically 30", text: $period)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .frame(width: 100)
-                        .padding(8)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.06)))
+
+                labeled("Period") {
+                    HStack(spacing: 6) {
+                        TextField("30", text: $period)
+                            .textFieldStyle(PlainTextFieldStyle())
+                        Text("sec")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(8)
+                    .frame(width: 110)
+                    .background(fieldBackground)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Algorithm").font(.caption).foregroundColor(.secondary)
-                    Picker("", selection: $algorithmIndex) {
-                        Text("SHA1").tag(0)
-                        Text("SHA256").tag(1)
-                        Text("SHA512").tag(2)
+
+                labeled("Algorithm") {
+                    Picker("", selection: $algorithm) {
+                        ForEach(OTPAlgorithm.allCases, id: \.self) { value in
+                            Text(value.rawValue).tag(value)
+                        }
                     }
                     .labelsHidden()
-                    .frame(width: 120)
+                    .frame(width: 130)
                 }
-                Spacer()
+
+                Spacer(minLength: 0)
             }
+
+            Text("Keep the default digits, period and algorithm unless the service says otherwise.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
         }
+    }
+
+    private func inputField(_ title: String, systemImage: String, placeholder: String, text: Binding<String>, monospaced: Bool = false) -> some View {
+        labeled(title) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .foregroundColor(.secondary)
+                    .frame(width: 16)
+                TextField(placeholder, text: text)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .font(monospaced ? .system(.body, design: .monospaced) : .body)
+            }
+            .padding(8)
+            .background(fieldBackground)
+        }
+    }
+
+    private func labeled<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            content()
+        }
+    }
+
+    private var fieldBackground: some View {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color.primary.opacity(0.06))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+            )
     }
 
     private func addAction() {
@@ -304,25 +337,23 @@ struct AddTokenSheet: View {
         issuer = ""
         account = ""
         secretBase32 = ""
-        digits = "6"
+        digits = 6
         period = "30"
-        algorithmIndex = 0
+        algorithm = .sha1
         errorMessage = nil
     }
 
     private func buildManualImported() throws -> ImportedToken {
         let cleanSecret = secretBase32.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let secret = Base32.decode(cleanSecret), !secret.isEmpty else { throw ImportError.badBase32 }
-        guard let d = Int(digits), (d == 6 || d == 8) else { throw ImportError.badDigits }
-        guard let p = Int(period), p > 0 else { throw ImportError.badPeriod }
+        guard let p = Int(period.trimmingCharacters(in: .whitespacesAndNewlines)), p > 0 else { throw ImportError.badPeriod }
         let cleanIssuer = issuer.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanAccount = account.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !(cleanIssuer.isEmpty && cleanAccount.isEmpty) else { throw ImportError.missingName }
-        let algo: OTPAlgorithm = (algorithmIndex == 1) ? .sha256 : (algorithmIndex == 2 ? .sha512 : .sha1)
         let token = OTPToken(
             issuer: cleanIssuer,
             account: cleanAccount,
-            digits: d, period: p, algorithm: algo,
+            digits: digits, period: p, algorithm: algorithm,
             isPinned: false, sortOrder: Int(Date().timeIntervalSince1970)
         )
         return ImportedToken(token: token, secret: secret)
@@ -343,19 +374,17 @@ struct AddTokenSheet: View {
     private func importFromClipboard() {
         errorMessage = nil
         let pb = NSPasteboard.general
-        if let data = pb.data(forType: .tiff), let img = NSImage(data: data) {
-            importImage(img: img)
-        } else if let str = pb.string(forType: .string), str.lowercased().hasPrefix("otpauth") {
-            self.otpauthText = str
-        } else {
-            self.errorMessage = "No QR image or otpauth/otpauth-migration link found in the clipboard."
-        }
-    }
+        let fileURLs = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
 
-    private func pasteFromClipboardIfText() {
-        let pb = NSPasteboard.general
-        if let str = pb.string(forType: .string), str.lowercased().hasPrefix("otpauth") {
-            self.otpauthText = str
+        if let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+           text.lowercased().hasPrefix("otpauth") {
+            otpauthText = text
+        } else if let url = fileURLs?.first {
+            importImage(at: url)
+        } else if let image = NSImage(pasteboard: pb) {
+            importImage(img: image)
+        } else {
+            errorMessage = "The clipboard has no QR image or otpauth link."
         }
     }
 
@@ -426,6 +455,12 @@ private struct CameraSheetView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            ViewfinderCorners()
+                .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                .frame(width: 230, height: 230)
+                .shadow(color: .black.opacity(0.5), radius: 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             // Overlay controls — live above the AVCaptureVideoPreviewLayer regardless of layout.
             VStack(spacing: 0) {
                 // Top bar
@@ -436,6 +471,7 @@ private struct CameraSheetView: View {
                             .foregroundColor(.white)
                     }
                     .buttonStyle(.plain)
+                    .keyboardShortcut(.cancelAction)
                     .help("Close")
 
                     Spacer()
@@ -452,41 +488,61 @@ private struct CameraSheetView: View {
                         .hidden()
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Color.black.opacity(0.55))
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+                .background(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.7), Color.black.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
 
                 Spacer()
 
                 // Bottom bar — always visible so the user can see / switch cameras.
-                if !cameras.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.white.opacity(0.7))
+                VStack(spacing: 10) {
+                    Text("Hold the QR code inside the frame")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.9))
 
-                        if cameras.count > 1 {
-                            Picker("", selection: $selectedCameraID) {
-                                ForEach(cameras, id: \.uniqueID) { cam in
-                                    Text(cam.localizedName).tag(Optional(cam.uniqueID))
+                    if !cameras.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.white.opacity(0.7))
+
+                            if cameras.count > 1 {
+                                Picker("", selection: $selectedCameraID) {
+                                    ForEach(cameras, id: \.uniqueID) { cam in
+                                        Text(cam.localizedName).tag(Optional(cam.uniqueID))
+                                    }
                                 }
+                                .labelsHidden()
+                                .frame(maxWidth: 260)
+                                .colorScheme(.dark)
+                            } else {
+                                Text(cameras[0].localizedName)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color.white.opacity(0.85))
                             }
-                            .labelsHidden()
-                            .frame(maxWidth: 260)
-                            .colorScheme(.dark)
-                        } else {
-                            Text(cameras[0].localizedName)
-                                .font(.system(size: 13))
-                                .foregroundColor(Color.white.opacity(0.85))
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black.opacity(0.55))
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 28)
+                .padding(.bottom, 14)
+                .frame(maxWidth: .infinity)
+                .background(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0), Color.black.opacity(0.75)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
         }
-        .frame(width: 540, height: 460)
+        .frame(width: 520, height: 400)
         .onAppear {
             // Discover cameras fresh each time the sheet opens.
             let found = CameraPreviewView.discoverCameras()
@@ -507,5 +563,25 @@ private struct CameraSheetView: View {
             }
         }
         .onDisappear { isRunning = false }
+    }
+}
+
+private struct ViewfinderCorners: Shape {
+    var length: CGFloat = 32
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let corners: [(CGPoint, CGFloat, CGFloat)] = [
+            (CGPoint(x: rect.minX, y: rect.minY), 1, 1),
+            (CGPoint(x: rect.maxX, y: rect.minY), -1, 1),
+            (CGPoint(x: rect.minX, y: rect.maxY), 1, -1),
+            (CGPoint(x: rect.maxX, y: rect.maxY), -1, -1),
+        ]
+        for (corner, dx, dy) in corners {
+            path.move(to: CGPoint(x: corner.x, y: corner.y + dy * length))
+            path.addLine(to: corner)
+            path.addLine(to: CGPoint(x: corner.x + dx * length, y: corner.y))
+        }
+        return path
     }
 }

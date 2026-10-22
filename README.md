@@ -127,16 +127,29 @@ A pinned window stays open after **Enter**. The shortcut can be turned off in [s
 
 ## Adding tokens
 
-Press **+** in the top-right corner of the list.
+Press **+** in the top-right corner of the list to open the **Add Token** window.
 
-**Link / QR** — paste an `otpauth://totp/…` link or a Google Authenticator export (`otpauth-migration://…`, many tokens at once), drop an image with a QR code onto the window, pick an image file, paste one from the clipboard, or scan it with the camera.
+### Link / QR
 
-**Manually** — enter the issuer, account, Base32 secret, digits (6 or 8), period (seconds) and algorithm (SHA1 / SHA256 / SHA512).
+- **Drop** an image with a QR code onto the window, or click **Choose Image…**
+- **Paste** takes whatever is on the clipboard: an `otpauth://` link, a copied image or an image file copied in Finder.
+- **Scan with Camera** works with any camera: the built-in one, an iPhone (Continuity Camera, macOS 14+) or a virtual camera such as OBS.
+- Or type a link into the **Link** field — `otpauth://totp/…` or a Google Authenticator export (`otpauth-migration://…`, many tokens at once).
 
 <p align="center">
   <img src="screenshots/add-link.png" width="420" alt="Add token — Link / QR">
+  <img src="screenshots/camera.png" width="420" alt="Scanning a QR code with the camera">
+</p>
+
+### Manually
+
+Enter the issuer and/or account and the Base32 secret. Change digits (6 or 8), period and algorithm (SHA1 / SHA256 / SHA512) only if the service says so.
+
+<p align="center">
   <img src="screenshots/add-manual.png" width="420" alt="Add token — Manually">
 </p>
+
+Press **Add**. The window stays open, so you can add several tokens in a row; **Close** or **Esc** closes it.
 
 - Tokens that already exist are skipped.
 - Entries GlassOTP can't generate codes for (HOTP or MD5 in a Google Authenticator export) are skipped and counted in the result message.
