@@ -3,6 +3,7 @@ import Foundation
 struct PersistenceService {
     private static let key = "GlassOTP.tokens.v1"
     private static let unreadableBackupKey = "GlassOTP.tokens.v1.unreadable"
+    private static let trashKey = "GlassOTP.trash.v1"
 
     static func save(tokens: [OTPToken]) {
         do {
@@ -28,6 +29,24 @@ struct PersistenceService {
         let salvaged = (try? JSONDecoder().decode([SalvagedToken].self, from: data))?
             .compactMap(\.token) ?? []
         return (salvaged, true)
+    }
+
+    static func save(trash: [TrashedToken]) {
+        guard let data = try? JSONEncoder().encode(trash) else { return }
+        UserDefaults.standard.set(data, forKey: trashKey)
+    }
+
+    static func loadTrash() -> [TrashedToken] {
+        guard let data = UserDefaults.standard.data(forKey: trashKey) else { return [] }
+        return (try? JSONDecoder().decode([SalvagedTrashItem].self, from: data))?.compactMap(\.item) ?? []
+    }
+}
+
+private struct SalvagedTrashItem: Decodable {
+    let item: TrashedToken?
+
+    init(from decoder: Decoder) throws {
+        item = try? TrashedToken(from: decoder)
     }
 }
 

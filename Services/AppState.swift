@@ -9,6 +9,9 @@ final class AppState: ObservableObject {
     private let requireUnlockKey = "GlassOTP.requireUnlock"
     private let copySoundKey = "GlassOTP.playSoundOnCopy"
     private let globalHotKeyKey = "GlassOTP.globalHotKey"
+    private let sortByUsageKey = "GlassOTP.sortByUsage"
+    private let hotpAdvanceKey = "GlassOTP.hotpAdvancesOnCopy"
+    private let clipboardKey = "GlassOTP.suggestFromClipboard"
 
     @Published var pinPopover: Bool {
         didSet { UserDefaults.standard.set(pinPopover, forKey: pinKey) }
@@ -32,6 +35,18 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(globalHotKeyEnabled, forKey: globalHotKeyKey) }
     }
 
+    @Published var sortByUsage: Bool {
+        didSet { UserDefaults.standard.set(sortByUsage, forKey: sortByUsageKey) }
+    }
+
+    @Published var hotpAdvancesOnCopy: Bool {
+        didSet { UserDefaults.standard.set(hotpAdvancesOnCopy, forKey: hotpAdvanceKey) }
+    }
+
+    @Published var suggestFromClipboard: Bool {
+        didSet { UserDefaults.standard.set(suggestFromClipboard, forKey: clipboardKey) }
+    }
+
     private init() {
         self.pinPopover = UserDefaults.standard.bool(forKey: pinKey)
         // Default ON to preserve existing behaviour; `object(forKey:)` distinguishes "unset" from "false".
@@ -39,6 +54,9 @@ final class AppState: ObservableObject {
         self.requireUnlock = UserDefaults.standard.object(forKey: requireUnlockKey) as? Bool ?? false
         self.playSoundOnCopy = UserDefaults.standard.object(forKey: copySoundKey) as? Bool ?? true
         self.globalHotKeyEnabled = UserDefaults.standard.object(forKey: globalHotKeyKey) as? Bool ?? true
+        self.sortByUsage = UserDefaults.standard.object(forKey: sortByUsageKey) as? Bool ?? true
+        self.hotpAdvancesOnCopy = UserDefaults.standard.object(forKey: hotpAdvanceKey) as? Bool ?? true
+        self.suggestFromClipboard = UserDefaults.standard.object(forKey: clipboardKey) as? Bool ?? true
     }
 }
 

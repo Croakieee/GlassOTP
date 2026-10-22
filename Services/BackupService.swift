@@ -59,7 +59,7 @@ struct BackupService {
             guard let secret = Data(base64Encoded: item.secret), !secret.isEmpty else {
                 throw BackupError.corruptedPayload
             }
-            return ImportedToken(token: item.token, secret: secret)
+            return ImportedToken(token: item.token, secret: secret, recoveryCodes: item.recoveryCodes ?? [])
         }
     }
 
@@ -120,7 +120,8 @@ struct BackupService {
     private static func buildPayload(tokens: [OTPToken], store: OTPStore) throws -> [BackupToken] {
         try tokens.map {
             let secret = try KeychainService.getSecret(for: $0.id)
-            return BackupToken(token: $0, secret: secret.base64EncodedString())
+            let codes = try RecoveryCode.decode(KeychainService.recoveryCodes(for: $0.id))
+            return BackupToken(token: $0, secret: secret.base64EncodedString(), recoveryCodes: codes.isEmpty ? nil : codes)
         }
     }
 }
@@ -130,4 +131,5 @@ struct BackupService {
 struct BackupToken: Codable {
     let token: OTPToken
     let secret: String
+    var recoveryCodes: [RecoveryCode]?
 }

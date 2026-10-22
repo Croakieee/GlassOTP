@@ -3,6 +3,7 @@ import Combine
 
 final class OTPStore: ObservableObject {
     @Published private(set) var tokens: [OTPToken] = []
+    @Published private(set) var trash: [TrashedToken] = []
     @Published var query: String = ""
 
     @Published private(set) var vaultCorrupted: Bool = false
@@ -13,6 +14,18 @@ final class OTPStore: ObservableObject {
 
     let timer = TimeStepTimer()
 
+    var sortByUsage: Bool = false {
+        didSet {
+            if sortByUsage != oldValue { refreshOrder() }
+        }
+    }
+
+    var hotpAdvancesOnCopy: Bool = true
+
+    static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
+    private static let usageHistoryLimit = 20
+    private static let usageHalfLife: TimeInterval = 14 * 24 * 60 * 60
+
     // КЕШ СЕКРЕТОВ (добавлено)
     private var secretCache: [UUID: Data] = [:]
 
@@ -20,20 +33,24 @@ final class OTPStore: ObservableObject {
 
     init(tokens: [OTPToken] = []) {
         guard tokens.isEmpty else {
-            self.tokens = OTPStore.sorted(tokens)
+            self.tokens = OTPStore.sorted(tokens, byUsage: false, now: Date())
             return
         }
 
         let saved = PersistenceService.load()
         let loaded = saved.tokens
+        let savedTrash = PersistenceService.loadTrash()
         self.tokenListUnreadable = saved.hadUnreadableData
         do {
             let ids = try KeychainService.storedSecretIDs()
-            self.tokens = OTPStore.sorted(loaded.filter { ids.contains($0.id.uuidString) })
+            self.tokens = OTPStore.sorted(loaded.filter { ids.contains($0.id.uuidString) }, byUsage: false, now: Date())
+            self.trash = savedTrash.filter { ids.contains($0.id.uuidString) }
         } catch {
-            self.tokens = OTPStore.sorted(loaded)
+            self.tokens = OTPStore.sorted(loaded, byUsage: false, now: Date())
+            self.trash = savedTrash
             applyVaultError(error)
         }
+        purgeExpiredTrash()
     }
 
     func retryKeychainAccess() {
@@ -73,12 +90,19 @@ final class OTPStore: ObservableObject {
     }
 
     func nextCode(for token: OTPToken) -> String? {
-        code(for: token, at: timer.now.addingTimeInterval(TimeInterval(token.period)))
+        guard token.kind.isTimeBased else { return nil }
+        return code(for: token, at: timer.now.addingTimeInterval(TimeInterval(token.period)))
     }
 
     private func code(for token: OTPToken, at date: Date) -> String? {
         guard let secret = cachedSecret(of: token) else { return nil }
-        return TOTPGenerator.code(for: date, token: token, secret: secret)
+        switch token.kind {
+        case .totp, .steam:
+            return TOTPGenerator.code(for: date, token: token, secret: secret)
+        case .hotp:
+            let current = tokens.first { $0.id == token.id } ?? token
+            return TOTPGenerator.code(counter: current.counter, token: current, secret: secret)
+        }
     }
 
     private func cachedSecret(of token: OTPToken) -> Data? {
@@ -98,14 +122,8 @@ final class OTPStore: ObservableObject {
 
     @discardableResult
     func addImportedMany(_ list: [ImportedToken]) -> ImportResult {
-        var contentKeys = Set<String>()
-        var secretsByID: [UUID: Data] = [:]
-        for token in tokens {
-            guard let secret = try? KeychainService.getSecret(for: token.id) else { continue }
-            secretsByID[token.id] = secret
-            contentKeys.insert(OTPStore.contentKey(token, secret: secret))
-        }
-        var usedIDs = Set(tokens.map(\.id))
+        var (contentKeys, secretsByID) = existingContent()
+        var usedIDs = Set(tokens.map(\.id)).union(trash.map(\.id))
 
         var added = 0
         var duplicates = 0
@@ -123,7 +141,8 @@ final class OTPStore: ObservableObject {
             let token = usedIDs.contains(named.id) ? named.withNewID() : named
 
             do {
-                try KeychainService.setSecret(item.secret, for: token.id)
+                let codes = try RecoveryCode.encode(item.recoveryCodes)
+                try KeychainService.setSecret(item.secret, for: token.id, recoveryCodes: codes)
             } catch {
                 failed += 1
                 continue
@@ -144,6 +163,22 @@ final class OTPStore: ObservableObject {
         return ImportResult(added: added, duplicates: duplicates, failed: failed)
     }
 
+    func newAccounts(in list: [ImportedToken]) -> [ImportedToken] {
+        var knownSecrets = Set(existingContent().secrets.values)
+        return list.filter { knownSecrets.insert($0.secret).inserted }
+    }
+
+    private func existingContent() -> (keys: Set<String>, secrets: [UUID: Data]) {
+        var contentKeys = Set<String>()
+        var secretsByID: [UUID: Data] = [:]
+        for token in tokens {
+            guard let secret = try? KeychainService.getSecret(for: token.id) else { continue }
+            secretsByID[token.id] = secret
+            contentKeys.insert(OTPStore.contentKey(token, secret: secret))
+        }
+        return (contentKeys, secretsByID)
+    }
+
     static let unnamedIssuer = "Unnamed"
 
     private static func namedIfBlank(_ token: OTPToken) -> OTPToken {
@@ -161,17 +196,65 @@ final class OTPStore: ObservableObject {
         return "\(issuer)|\(account)|\(Base32.encode(secret))"
     }
 
-    func remove(_ tokenID: UUID) {
+    func remove(_ tokenID: UUID, at date: Date = Date()) {
         if let idx = tokens.firstIndex(where: { $0.id == tokenID }) {
-            let token = tokens[idx]
-            tokens.remove(at: idx)
-            try? KeychainService.deleteSecret(for: token.id)
+            let token = tokens.remove(at: idx)
 
             // очистка кеша
             secretCache[tokenID] = nil
 
+            trash.insert(TrashedToken(token: token, deletedAt: date), at: 0)
+            PersistenceService.save(trash: trash)
             commit()
         }
+    }
+
+    func restore(_ tokenID: UUID) {
+        guard let idx = trash.firstIndex(where: { $0.id == tokenID }) else { return }
+        let item = trash.remove(at: idx)
+        tokens.append(item.token)
+        PersistenceService.save(trash: trash)
+        commit()
+    }
+
+    func deletePermanently(_ tokenID: UUID) {
+        guard let idx = trash.firstIndex(where: { $0.id == tokenID }) else { return }
+        trash.remove(at: idx)
+        try? KeychainService.deleteSecret(for: tokenID)
+        PersistenceService.save(trash: trash)
+    }
+
+    func emptyTrash() {
+        for item in trash {
+            try? KeychainService.deleteSecret(for: item.id)
+        }
+        trash.removeAll()
+        PersistenceService.save(trash: trash)
+    }
+
+    func purgeExpiredTrash(now: Date = Date()) {
+        guard !vaultCorrupted, !keychainUnavailable else { return }
+        let expired = trash.filter { now.timeIntervalSince($0.deletedAt) >= Self.trashRetention }
+        guard !expired.isEmpty else { return }
+        for item in expired {
+            try? KeychainService.deleteSecret(for: item.id)
+        }
+        let expiredIDs = Set(expired.map(\.id))
+        trash.removeAll { expiredIDs.contains($0.id) }
+        PersistenceService.save(trash: trash)
+    }
+
+    func recoveryCodes(for tokenID: UUID) throws -> [RecoveryCode] {
+        try RecoveryCode.decode(KeychainService.recoveryCodes(for: tokenID))
+    }
+
+    func saveRecoveryCodes(_ codes: [RecoveryCode], for tokenID: UUID) throws {
+        try KeychainService.setRecoveryCodes(RecoveryCode.encode(codes), for: tokenID)
+    }
+
+    static func daysLeft(in item: TrashedToken, now: Date) -> Int {
+        let remaining = trashRetention - now.timeIntervalSince(item.deletedAt)
+        return max(0, Int(ceil(remaining / 86_400)))
     }
 
     func rename(_ tokenID: UUID, issuer: String, account: String) {
@@ -202,17 +285,68 @@ final class OTPStore: ObservableObject {
         commit()
     }
 
+    func recordUse(_ tokenID: UUID, at date: Date = Date()) {
+        guard let idx = tokens.firstIndex(where: { $0.id == tokenID }) else { return }
+        var t = tokens[idx]
+        t.recentUses = Array((t.recentUses + [date]).suffix(Self.usageHistoryLimit))
+        if t.kind == .hotp && hotpAdvancesOnCopy {
+            t.counter = Self.advanced(t.counter)
+        }
+        tokens[idx] = t
+        PersistenceService.save(tokens: tokens)
+    }
+
+    func advanceCounter(_ tokenID: UUID) {
+        guard let idx = tokens.firstIndex(where: { $0.id == tokenID }), tokens[idx].kind == .hotp else { return }
+        var t = tokens[idx]
+        t.counter = Self.advanced(t.counter)
+        tokens[idx] = t
+        PersistenceService.save(tokens: tokens)
+    }
+
+    private static func advanced(_ counter: UInt64) -> UInt64 {
+        counter == .max ? counter : counter + 1
+    }
+
+    func setProtected(_ tokenID: UUID, _ isProtected: Bool) {
+        guard let idx = tokens.firstIndex(where: { $0.id == tokenID }) else { return }
+        var t = tokens[idx]
+        t.isProtected = isProtected
+        tokens[idx] = t
+        PersistenceService.save(tokens: tokens)
+    }
+
+    func refreshOrder(now: Date = Date()) {
+        tokens = OTPStore.sorted(tokens, byUsage: sortByUsage, now: now)
+    }
+
     private func commit() {
-        tokens = OTPStore.sorted(tokens)
+        refreshOrder()
         PersistenceService.save(tokens: tokens)
     }
 
     // MARK: - Sorting
 
-    private static func sorted(_ arr: [OTPToken]) -> [OTPToken] {
-        arr.sorted { lhs, rhs in
+    static func usageScore(_ token: OTPToken, now: Date) -> Double {
+        token.recentUses.reduce(0) { score, use in
+            score + pow(0.5, max(0, now.timeIntervalSince(use)) / usageHalfLife)
+        }
+    }
+
+    static func sorted(_ arr: [OTPToken], byUsage: Bool, now: Date) -> [OTPToken] {
+        let scores = byUsage
+            ? Dictionary(arr.map { ($0.id, usageScore($0, now: now)) }, uniquingKeysWith: { first, _ in first })
+            : [:]
+        return arr.sorted { lhs, rhs in
             if lhs.isPinned != rhs.isPinned {
                 return lhs.isPinned && !rhs.isPinned
+            }
+            if byUsage, !lhs.isPinned {
+                let lhsScore = scores[lhs.id] ?? 0
+                let rhsScore = scores[rhs.id] ?? 0
+                if abs(lhsScore - rhsScore) > 0.000_001 {
+                    return lhsScore > rhsScore
+                }
             }
             if lhs.sortOrder != rhs.sortOrder {
                 return lhs.sortOrder < rhs.sortOrder
@@ -247,6 +381,8 @@ final class OTPStore: ObservableObject {
     func removeAllTokens() throws {
         try KeychainService.removeAll()
         tokens.removeAll()
+        trash.removeAll()
+        PersistenceService.save(trash: trash)
         secretCache.removeAll()
         vaultCorrupted = false
         keychainUnavailable = false

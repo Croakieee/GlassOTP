@@ -25,6 +25,7 @@ struct RootPopoverView: View {
 
     // edit secret
     @State private var editSecretToken: OTPToken?
+    @State private var recoveryToken: OTPToken?
 
     // QR
     @State private var qrToken: OTPToken?
@@ -40,7 +41,12 @@ struct RootPopoverView: View {
 
     @State private var keyboardActive: Bool = false
     @State private var selectedID: UUID?
-    @State private var keyboardCopiedID: UUID?
+    @State private var keyboardCopy: CopiedCode?
+    @State private var revealedIDs: Set<UUID> = []
+
+    @State private var showTrash: Bool = false
+    @StateObject private var clipboard = ClipboardSuggester()
+    @State private var undoDeletedID: UUID?
 
     var body: some View {
 
@@ -60,12 +66,16 @@ struct RootPopoverView: View {
                     autoCloseOnCopy: $appState.autoCloseOnCopy,
                     playsCopySound: appState.playSoundOnCopy,
                     selectedID: highlightedID,
-                    keyboardCopiedID: keyboardCopiedID,
+                    keyboardCopy: keyboardCopy,
+                    revealedIDs: revealedIDs,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
                     onDelete: { id in beginDelete(id) },
-                    onShowQR: { id in beginShowQR(id) }
+                    onShowQR: { id in beginShowQR(id) },
+                    onToggleProtection: { id in toggleProtection(id) },
+                    onRecoveryCodes: { id in beginRecoveryCodes(id) },
+                    onUnlockCopy: { token in unlockAndCopy(token) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             } else {
@@ -90,10 +100,12 @@ struct RootPopoverView: View {
         .onAppear {
             applyLockOnOpen()
             refreshNotificationStatus()
+            refreshClipboard()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
             applyLockOnOpen()
             refreshNotificationStatus()
+            refreshClipboard()
             keyboardActive = note.userInfo?[PopoverUserInfo.openedViaHotKey] as? Bool ?? false
             selectedID = store.filteredTokens().first?.id
         }
@@ -111,10 +123,15 @@ struct RootPopoverView: View {
             store.query = ""
             keyboardActive = false
             selectedID = nil
-            keyboardCopiedID = nil
+            keyboardCopy = nil
+            revealedIDs = []
+            undoDeletedID = nil
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
+        }
+        .onChange(of: appState.suggestFromClipboard) { _ in
+            refreshClipboard()
         }
         .onChange(of: appState.requireUnlock) { enabled in
             // Enabling locks immediately; disabling reveals the content.
@@ -160,15 +177,28 @@ struct RootPopoverView: View {
 
         }
 
+        .sheet(item: $recoveryToken) { token in
+            RecoveryCodesView(store: store, token: token) {
+                recoveryToken = nil
+            }
+        }
+
+        .sheet(isPresented: $showTrash) {
+            RecentlyDeletedView(store: store) {
+                showTrash = false
+            }
+        }
+
         .alert(isPresented: $showDeleteAlert) {
 
             Alert(
                 title: Text("Delete token?"),
-                message: Text("This action cannot be undone. The secret will be removed from the keychain."),
+                message: Text("It will be kept in Recently Deleted for 30 days, so you can restore it."),
                 primaryButton: .destructive(Text("Delete")) {
 
                     if let id = deleteTokenID {
                         store.remove(id)
+                        offerUndo(for: id)
                     }
 
                     deleteTokenID = nil
@@ -200,8 +230,18 @@ struct RootPopoverView: View {
             Menu {
                 Toggle("Close after copy", isOn: $appState.autoCloseOnCopy)
                 Toggle("Play sound on copy", isOn: $appState.playSoundOnCopy)
+                Toggle("Frequently used first", isOn: $appState.sortByUsage)
+                if store.tokens.contains(where: { $0.kind == .hotp }) {
+                    Toggle("HOTP: new code after each copy", isOn: $appState.hotpAdvancesOnCopy)
+                }
+                Toggle("Suggest accounts from clipboard", isOn: $appState.suggestFromClipboard)
                 Toggle("Global shortcut ⌥⌘O", isOn: $appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
+                Divider()
+                Button(store.trash.isEmpty ? "Recently Deleted" : "Recently Deleted (\(store.trash.count))…") {
+                    showTrash = true
+                }
+                .disabled(store.trash.isEmpty || !showContent)
             } label: {
                 Image(systemName: "slider.horizontal.3")
             }
@@ -228,6 +268,31 @@ struct RootPopoverView: View {
 
     @ViewBuilder
     private var warnings: some View {
+        if showContent, let offer = clipboard.offer {
+            ClipboardBanner(
+                offer: offer,
+                onAdd: { clipboard.accept(store: store) },
+                onCheck: { clipboard.check(store: store) },
+                onDismiss: { clipboard.dismiss() }
+            )
+        }
+        if let id = undoDeletedID, let item = store.trash.first(where: { $0.id == id }) {
+            HStack(spacing: 0) {
+                warningLine(
+                    icon: "trash",
+                    text: "“\(item.token.displayTitle)” moved to Recently Deleted.",
+                    color: .secondary
+                )
+                Button("Undo") {
+                    store.restore(id)
+                    undoDeletedID = nil
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .font(.footnote)
+                .foregroundColor(.accentColor)
+                .padding(.trailing, 6)
+            }
+        }
         if store.vaultCorrupted {
             warningLine(
                 icon: "exclamationmark.triangle.fill",
@@ -245,6 +310,7 @@ struct RootPopoverView: View {
                 Button("Retry", action: retryKeychainAccess)
                     .buttonStyle(BorderlessButtonStyle())
                     .font(.footnote)
+                    .foregroundColor(.accentColor)
                     .padding(.trailing, 6)
             }
         }
@@ -437,16 +503,76 @@ struct RootPopoverView: View {
         }
     }
 
+    private func isLocked(_ token: OTPToken) -> Bool {
+        token.isProtected && !revealedIDs.contains(token.id)
+    }
+
     private func copyWithKeyboard(_ token: OTPToken) {
-        guard let code = store.code(for: token) else { return }
-        CodeClipboard.copy(code, playSound: appState.playSoundOnCopy)
-        keyboardCopiedID = token.id
+        guard isLocked(token) else {
+            finishKeyboardCopy(token)
+            return
+        }
+        runLockAuth {
+            revealedIDs.insert(token.id)
+            finishKeyboardCopy(token)
+        }
+    }
+
+    private func finishKeyboardCopy(_ token: OTPToken) {
+        guard copyRevealed(token) else { return }
         NotificationCenter.default.post(name: .keyboardCopyDone, object: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if keyboardCopiedID == token.id {
-                keyboardCopiedID = nil
+    }
+
+    private func unlockAndCopy(_ token: OTPToken) {
+        runLockAuth {
+            revealedIDs.insert(token.id)
+            guard copyRevealed(token), appState.autoCloseOnCopy else { return }
+            NotificationCenter.default.post(name: .autoClosePopover, object: nil)
+        }
+    }
+
+    private func copyRevealed(_ token: OTPToken) -> Bool {
+        guard let code = store.code(for: token) else { return false }
+        CodeClipboard.copy(code, playSound: appState.playSoundOnCopy)
+        let copy = CopiedCode(id: token.id, code: code)
+        keyboardCopy = copy
+        store.recordUse(token.id)
+        DispatchQueue.main.asyncAfter(deadline: .now() + TokenRowView.copiedFeedbackDuration) {
+            if keyboardCopy == copy {
+                keyboardCopy = nil
             }
         }
+        return true
+    }
+
+    private func toggleProtection(_ id: UUID) {
+        guard let token = store.tokens.first(where: { $0.id == id }) else { return }
+        guard token.isProtected else {
+            revealedIDs.remove(id)
+            store.setProtected(id, true)
+            return
+        }
+        runLockAuth {
+            store.setProtected(id, false)
+        }
+    }
+
+    private func beginRecoveryCodes(_ id: UUID) {
+        runLockAuth {
+            recoveryToken = store.tokens.first { $0.id == id }
+        }
+    }
+
+    private func withAuth(force: Bool, _ action: @escaping () -> Void) {
+        guard force || !isAuthRecent() else {
+            action()
+            return
+        }
+        runLockAuth(action)
+    }
+
+    private func requiresFreshAuth(_ id: UUID) -> Bool {
+        store.tokens.first(where: { $0.id == id })?.isProtected ?? false
     }
 
     private func beginRename(_ id: UUID) {
@@ -461,9 +587,7 @@ struct RootPopoverView: View {
 
     private func beginEditSecret(_ id: UUID) {
 
-        authenticate { success in
-
-            guard success else { return }
+        withAuth(force: requiresFreshAuth(id)) {
 
             if let t = store.tokens.first(where: { $0.id == id }) {
                 editSecretToken = t
@@ -475,9 +599,7 @@ struct RootPopoverView: View {
 
     private func beginShowQR(_ id: UUID) {
 
-        authenticate { success in
-
-            guard success else { return }
+        withAuth(force: requiresFreshAuth(id)) {
 
             if let t = store.tokens.first(where: { $0.id == id }) {
                 qrToken = t
@@ -485,6 +607,23 @@ struct RootPopoverView: View {
 
         }
 
+    }
+
+    private func refreshClipboard() {
+        guard appState.suggestFromClipboard else {
+            clipboard.hide()
+            return
+        }
+        clipboard.refresh(store: store)
+    }
+
+    private func offerUndo(for id: UUID) {
+        undoDeletedID = id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            if undoDeletedID == id {
+                undoDeletedID = nil
+            }
+        }
     }
 
     private func beginDelete(_ id: UUID) {

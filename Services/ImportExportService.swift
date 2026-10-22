@@ -3,6 +3,7 @@ import Foundation
 struct ImportedToken {
     let token: OTPToken
     let secret: Data
+    var recoveryCodes: [RecoveryCode] = []
 }
 
 struct ImportResult {
@@ -19,20 +20,22 @@ enum ImportError: Error, LocalizedError {
     case badDigits
     case badPeriod
     case badAlgorithm
+    case badCounter
     case noSupportedTokens
     case missingName
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: return "Invalid link."
-        case .unsupportedType: return "Supported: otpauth://totp/… and otpauth-migration://…"
+        case .unsupportedType: return "Supported: otpauth://totp/…, otpauth://hotp/…, otpauth://steam/… and otpauth-migration://…"
         case .missingSecret: return "Missing secret parameter."
         case .badBase32: return "Failed to decode the secret (Base32)."
         case .badDigits: return "Only 6- or 8-digit codes are supported."
         case .badPeriod: return "The period must be a whole number of seconds greater than 0."
         case .badAlgorithm: return "Unsupported algorithm. Use SHA1, SHA256 or SHA512."
+        case .badCounter: return "The counter must be a whole number of 0 or more."
         case .noSupportedTokens:
-            return "None of these accounts can be added: only time-based (TOTP) codes with SHA1/SHA256/SHA512 and 6 or 8 digits are supported."
+            return "None of these accounts can be added: only TOTP and HOTP codes with SHA1/SHA256/SHA512 and 6 or 8 digits are supported."
         case .missingName: return "Enter an issuer or an account name."
         }
     }
@@ -62,7 +65,7 @@ struct ImportExportService {
     static func parseOtpauth(_ urlString: String) throws -> ImportedToken {
         guard let url = URL(string: urlString) else { throw ImportError.invalidURL }
         guard url.scheme?.lowercased() == "otpauth" else { throw ImportError.invalidURL }
-        guard url.host?.lowercased() == "totp" else { throw ImportError.unsupportedType }
+        guard let declaredKind = OTPKind(rawValue: url.host?.lowercased() ?? "") else { throw ImportError.unsupportedType }
 
         let rawLabel = url.path.removingPercentEncoding?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
         var issuerFromLabel = ""
@@ -90,12 +93,29 @@ struct ImportExportService {
         let accountParam = q["account"]?.removingPercentEncoding ?? ""
         let issuer = issuerParam.isEmpty ? issuerFromLabel : issuerParam
         let account = accountParam.isEmpty ? accountFromLabel : accountParam
+        let kind = isSteam(declaredKind, issuer: issuer, query: q) ? OTPKind.steam : declaredKind
+
+        guard kind != .steam else {
+            let token = OTPToken(
+                issuer: issuer.isEmpty ? steamIssuer : issuer,
+                account: account,
+                digits: OTPKind.steamDigits,
+                sortOrder: Int(Date().timeIntervalSince1970),
+                kind: .steam
+            )
+            return ImportedToken(token: token, secret: secret)
+        }
 
         guard let digits = value(q["digits"], default: 6, { Int($0).flatMap { [6, 8].contains($0) ? $0 : nil } }) else {
             throw ImportError.badDigits
         }
-        guard let period = value(q["period"], default: 30, { Int($0).flatMap { $0 > 0 ? $0 : nil } }) else {
+        let periodParam = kind == .totp ? q["period"] : nil
+        guard let period = value(periodParam, default: 30, { Int($0).flatMap { $0 > 0 ? $0 : nil } }) else {
             throw ImportError.badPeriod
+        }
+        let counterParam = kind == .hotp ? q["counter"] : nil
+        guard let counter = value(counterParam, default: UInt64(0), { UInt64($0) }) else {
+            throw ImportError.badCounter
         }
         guard let algorithm = value(q["algorithm"], default: OTPAlgorithm.sha1, { OTPAlgorithm(rawValue: $0.uppercased()) }) else {
             throw ImportError.badAlgorithm
@@ -108,7 +128,9 @@ struct ImportExportService {
             period: period,
             algorithm: algorithm,
             isPinned: false,
-            sortOrder: Int(Date().timeIntervalSince1970)
+            sortOrder: Int(Date().timeIntervalSince1970),
+            kind: kind,
+            counter: counter
         )
         return ImportedToken(token: token, secret: secret)
     }
@@ -140,7 +162,13 @@ struct ImportExportService {
             case 2: digits = 8
             default: digits = nil
             }
-            guard p.type == 2, !p.secret.isEmpty, let algo, let digits else {
+            let kind: OTPKind?
+            switch p.type {
+            case 1: kind = .hotp
+            case 2: kind = .totp
+            default: kind = nil
+            }
+            guard let kind, !p.secret.isEmpty, let algo, let digits else {
                 unsupported += 1
                 continue
             }
@@ -160,12 +188,24 @@ struct ImportExportService {
                 period: 30,   // migration не передаёт period; дефолт 30
                 algorithm: algo,
                 isPinned: false,
-                sortOrder: Int(Date().timeIntervalSince1970)
+                sortOrder: Int(Date().timeIntervalSince1970),
+                kind: kind,
+                counter: kind == .hotp ? p.counter : 0
             )
             result.append(ImportedToken(token: token, secret: p.secret))
         }
         if result.isEmpty { throw ImportError.noSupportedTokens }
         return ParsedLink(tokens: result, unsupported: unsupported)
+    }
+
+    static let steamIssuer = "Steam"
+
+    private static func isSteam(_ kind: OTPKind, issuer: String, query: [String: String]) -> Bool {
+        guard kind == .totp else { return kind == .steam }
+        if query["encoder"]?.lowercased() == steamIssuer.lowercased() { return true }
+        let digits = query["digits"] ?? ""
+        return issuer.caseInsensitiveCompare(steamIssuer) == .orderedSame
+            && (digits.isEmpty || digits == String(OTPKind.steamDigits))
     }
 
     private static func value<T>(_ raw: String?, default fallback: T, _ parse: (String) -> T?) -> T? {
