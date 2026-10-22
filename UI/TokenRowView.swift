@@ -3,9 +3,11 @@ import AppKit
 
 struct TokenRowView: View {
     let title: String
-    let code: String
+    let code: String?
+    let digits: Int
     let remaining: Int
     let period: Int
+    let playsSound: Bool
     let onCopy: () -> Void
 
     @State private var copied = false
@@ -26,12 +28,15 @@ struct TokenRowView: View {
                     Text(title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(title)
 
                     HStack(spacing: 8) {
 
-                        Text(code)
+                        Text(Self.grouped(code ?? String(repeating: "-", count: digits)))
                             .font(.system(size: 20, weight: .medium, design: .monospaced))
-                            .foregroundColor(.primary)
+                            .foregroundColor(code == nil ? .secondary : .primary)
                             .opacity(copied ? 0.35 : 1.0)
 
                         if copied {
@@ -104,23 +109,30 @@ struct TokenRowView: View {
     }
 
     private func copyAction() {
+        guard let code else { return }
+
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(code, forType: .string)
-        // Mark the entry as sensitive so well-behaved clipboard managers don't log/retain it.
-        // (No auto-clear: the code stays available until the next copy, so a paste never races
-        // a timer.)
         pb.setString("", forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
 
         onCopy()
         copied = true
 
-        NSSound(named: NSSound.Name("Pop"))?.play()
+        if playsSound {
+            NSSound(named: NSSound.Name("Pop"))?.play()
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation {
                 copied = false
             }
         }
+    }
+
+    private static func grouped(_ code: String) -> String {
+        guard code.count >= 6, code.count % 2 == 0 else { return code }
+        let middle = code.index(code.startIndex, offsetBy: code.count / 2)
+        return String(code[..<middle]) + " " + String(code[middle...])
     }
 }

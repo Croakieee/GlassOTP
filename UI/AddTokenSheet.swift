@@ -8,7 +8,7 @@ enum AddMode: String, CaseIterable {
 }
 
 struct AddTokenSheet: View {
-    let onAddMany: ([ImportedToken]) -> Int
+    let onAddMany: ([ImportedToken]) -> ImportResult
     let onClose: () -> Void
 
     @State private var mode: AddMode = .otpauth
@@ -267,29 +267,32 @@ struct AddTokenSheet: View {
         errorMessage = nil
         do {
             let list: [ImportedToken]
+            var unsupported = 0
             if mode == .otpauth {
-                list = try ImportExportService.parseOtpauthOrMigration(
+                let parsed = try ImportExportService.parseOtpauthOrMigration(
                     otpauthText.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
+                list = parsed.tokens
+                unsupported = parsed.unsupported
             } else {
                 list = [try buildManualImported()]
             }
-            // Use the real count returned by the store, not list.count: duplicates (and any
-            // token whose secret failed to persist) are skipped, so list.count would lie.
-            let added = onAddMany(list)
-            let skipped = list.count - added
+            let result = onAddMany(list)
 
-            if added > 0 {
-                var msg = "Added \(added) token(s)"
-                if skipped > 0 { msg += ", \(skipped) skipped" }
+            if result.added > 0 {
+                var msg = "Added \(result.added) token(s)"
+                if result.duplicates > 0 { msg += ", \(result.duplicates) already existed" }
+                if result.failed > 0 { msg += ", \(result.failed) couldn't be saved" }
+                if unsupported > 0 { msg += ", \(unsupported) unsupported (HOTP/MD5) skipped" }
                 withAnimation { addedMessage = msg }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
                 clearAllFields()
+            } else if result.failed > 0 {
+                errorMessage = "Couldn't save to the Keychain. Check the warning in the GlassOTP menu-bar window."
             } else {
-                // Nothing added — every token was a duplicate (or couldn't be stored).
-                errorMessage = skipped <= 1
+                errorMessage = result.duplicates <= 1
                     ? "This token already exists."
-                    : "All \(skipped) tokens already exist."
+                    : "All \(result.duplicates) tokens already exist."
             }
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -312,10 +315,13 @@ struct AddTokenSheet: View {
         guard let secret = Base32.decode(cleanSecret), !secret.isEmpty else { throw ImportError.badBase32 }
         guard let d = Int(digits), (d == 6 || d == 8) else { throw ImportError.badDigits }
         guard let p = Int(period), p > 0 else { throw ImportError.badPeriod }
+        let cleanIssuer = issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAccount = account.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !(cleanIssuer.isEmpty && cleanAccount.isEmpty) else { throw ImportError.missingName }
         let algo: OTPAlgorithm = (algorithmIndex == 1) ? .sha256 : (algorithmIndex == 2 ? .sha512 : .sha1)
         let token = OTPToken(
-            issuer: issuer.trimmingCharacters(in: .whitespacesAndNewlines),
-            account: account.trimmingCharacters(in: .whitespacesAndNewlines),
+            issuer: cleanIssuer,
+            account: cleanAccount,
             digits: d, period: p, algorithm: algo,
             isPinned: false, sortOrder: Int(Date().timeIntervalSince1970)
         )
@@ -354,8 +360,6 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
-        // Vision QR detection can be slow on large images — keep it off the main thread and
-        // hop back only to update @State.
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let link = try QRService.scanOtpauth(from: url)

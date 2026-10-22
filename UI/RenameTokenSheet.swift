@@ -46,6 +46,10 @@ struct RenameTokenSheet: View {
                     presentation.wrappedValue.dismiss()
                 }
                 .keyboardShortcut(.return)
+                .disabled(
+                    issuer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        && account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
             }
             .padding(.top, 6)
         }

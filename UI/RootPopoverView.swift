@@ -1,5 +1,4 @@
 import SwiftUI
-import LocalAuthentication
 import Combine
 import UserNotifications
 
@@ -7,7 +6,6 @@ private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
 struct RootPopoverView: View {
 
-    // Owned by AppDelegate and injected, so the same instance backs the status-bar menu.
     @ObservedObject private var store: OTPStore
     @ObservedObject private var appState = AppState.shared
 
@@ -38,7 +36,6 @@ struct RootPopoverView: View {
     @State private var deleteTokenID: UUID?
     @State private var showDeleteAlert: Bool = false
 
-    // compact in-UI notice when notifications are off (so missing export/import banners are explained)
     @State private var notificationsDenied: Bool = false
 
     var body: some View {
@@ -57,6 +54,7 @@ struct RootPopoverView: View {
                     store: store,
                     timer: store.timer,
                     autoCloseOnCopy: $appState.autoCloseOnCopy,
+                    playsCopySound: appState.playSoundOnCopy,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
@@ -71,8 +69,6 @@ struct RootPopoverView: View {
 
         }
         // Snug padding: close to the rounded edges but with a little breathing room.
-        // No bottom padding: the list runs to the popover's bottom edge so a partially
-        // visible row hints that there is more to scroll.
         .padding(.horizontal, 6)
         .padding(.top, 8)
         // Single rounded card that fills the popover: content + material are clipped to the
@@ -94,6 +90,7 @@ struct RootPopoverView: View {
             refreshNotificationStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
+            store.query = ""
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
@@ -181,6 +178,7 @@ struct RootPopoverView: View {
 
             Menu {
                 Toggle("Close after copy", isOn: $appState.autoCloseOnCopy)
+                Toggle("Play sound on copy", isOn: $appState.playSoundOnCopy)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
             } label: {
                 Image(systemName: "slider.horizontal.3")
@@ -206,14 +204,32 @@ struct RootPopoverView: View {
         }
     }
 
-    // MARK: Warnings
-
     @ViewBuilder
     private var warnings: some View {
         if store.vaultCorrupted {
             warningLine(
                 icon: "exclamationmark.triangle.fill",
-                text: "Secret storage looks damaged. Restore from a backup.",
+                text: "Secret storage is damaged. Use Delete All in the menu, then import a backup.",
+                color: .orange
+            )
+        }
+        if store.keychainUnavailable {
+            HStack(spacing: 0) {
+                warningLine(
+                    icon: "exclamationmark.triangle.fill",
+                    text: "No access to the Keychain, so codes can't be shown.",
+                    color: .orange
+                )
+                Button("Retry", action: retryKeychainAccess)
+                    .buttonStyle(BorderlessButtonStyle())
+                    .font(.footnote)
+                    .padding(.trailing, 6)
+            }
+        }
+        if store.tokenListUnreadable {
+            warningLine(
+                icon: "exclamationmark.triangle.fill",
+                text: "Some saved tokens couldn't be read. Restore missing ones from a backup.",
                 color: .orange
             )
         }
@@ -238,7 +254,12 @@ struct RootPopoverView: View {
         .padding(.horizontal, 6)
     }
 
-    /// Refresh whether notifications are denied, so the compact notice reflects current state.
+    private func retryKeychainAccess() {
+        NotificationCenter.default.post(name: .lockAuthBegan, object: nil)
+        store.retryKeychainAccess()
+        NotificationCenter.default.post(name: .lockAuthEnded, object: nil)
+    }
+
     private func refreshNotificationStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let denied = settings.authorizationStatus == .denied
@@ -351,30 +372,11 @@ struct RootPopoverView: View {
             return
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-
-        let context = LAContext()
-        var error: NSError?
-
-        let reason = "Authenticate to access protected OTP data"
-
-        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-
-            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
-
-                DispatchQueue.main.async {
-
-                    if success {
-                        lastAuthTime = Date()
-                    }
-
-                    completion(success)
-                }
-
+        DeviceAuth.authenticate(reason: "access your protected OTP data") { success in
+            if success {
+                lastAuthTime = Date()
             }
-
-        } else {
-            completion(true)
+            completion(success)
         }
     }
 

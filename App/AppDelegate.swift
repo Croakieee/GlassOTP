@@ -10,9 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 
-        // The login item runs the executable directly, which bypasses LaunchServices' own
-        // single-instance check. If an older copy is already running, quit this one so there
-        // is never a second status-bar icon.
         if let bundleID = Bundle.main.bundleIdentifier {
             let me = NSRunningApplication.current
             let olderExists = NSRunningApplication
@@ -35,10 +32,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationService.shared.requestPermission()
         }
 
-        // Single source of truth, created once and shared with both the popover UI and the
-        // status-bar menu. Previously the store reached the controller only via .storeReady
-        // posted from the popover's onAppear, so the menu's Export/Import/Delete All were
-        // dead until the popover had been opened at least once.
         let store = OTPStore()
         self.store = store
 

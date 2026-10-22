@@ -5,10 +5,11 @@ final class OTPStore: ObservableObject {
     @Published private(set) var tokens: [OTPToken] = []
     @Published var query: String = ""
 
-    /// True when the keychain vault exists but can't be decoded (corruption). The data is left
-    /// untouched (never overwritten), and the UI uses this to warn the user to restore a backup
-    /// instead of silently showing blank codes.
     @Published private(set) var vaultCorrupted: Bool = false
+
+    @Published private(set) var keychainUnavailable: Bool = false
+
+    @Published private(set) var tokenListUnreadable: Bool = false
 
     let timer = TimeStepTimer()
 
@@ -19,24 +20,40 @@ final class OTPStore: ObservableObject {
 
     init(tokens: [OTPToken] = []) {
         guard tokens.isEmpty else {
-            // Explicit injection (previews / tests): take as-is, no keychain involvement.
             self.tokens = OTPStore.sorted(tokens)
             return
         }
 
-        let loaded = PersistenceService.load()
+        let saved = PersistenceService.load()
+        let loaded = saved.tokens
+        self.tokenListUnreadable = saved.hadUnreadableData
         do {
-            // Drop "ghost" tokens whose secret is no longer in the vault (would only render as
-            // dashes). Only when the vault reads cleanly.
             let ids = try KeychainService.storedSecretIDs()
             self.tokens = OTPStore.sorted(loaded.filter { ids.contains($0.id.uuidString) })
         } catch {
-            // Vault unreadable: keep EVERY token (never prune on a transient/failed read), and
-            // flag genuine corruption so the UI can surface it.
             self.tokens = OTPStore.sorted(loaded)
-            if case KeychainError.decode = error {
-                self.vaultCorrupted = true
-            }
+            applyVaultError(error)
+        }
+    }
+
+    func retryKeychainAccess() {
+        KeychainService.retryAccess()
+        do {
+            _ = try KeychainService.storedSecretIDs()
+            keychainUnavailable = false
+            vaultCorrupted = false
+        } catch {
+            applyVaultError(error)
+        }
+        objectWillChange.send()
+    }
+
+    private func applyVaultError(_ error: Error) {
+        if case KeychainError.decode = error {
+            vaultCorrupted = true
+            keychainUnavailable = false
+        } else {
+            keychainUnavailable = true
         }
     }
 
@@ -51,20 +68,14 @@ final class OTPStore: ObservableObject {
         }
     }
 
-    // ИСПРАВЛЕНО (использует кеш)
-    func code(for token: OTPToken) -> String {
-
+    func code(for token: OTPToken) -> String? {
         if let cached = secretCache[token.id] {
             return TOTPGenerator.code(for: timer.now, token: token, secret: cached)
         }
 
-        do {
-            let secret = try KeychainService.getSecret(for: token.id)
-            secretCache[token.id] = secret
-            return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
-        } catch {
-            return String(repeating: "-", count: token.digits)
-        }
+        guard let secret = try? KeychainService.getSecret(for: token.id) else { return nil }
+        secretCache[token.id] = secret
+        return TOTPGenerator.code(for: timer.now, token: token, secret: secret)
     }
 
     func remaining(for token: OTPToken) -> Int {
@@ -74,75 +85,68 @@ final class OTPStore: ObservableObject {
     // MARK: - Mutations (+ persist)
 
     @discardableResult
-    func addImportedMany(_ list: [ImportedToken]) -> Int {
+    func addImportedMany(_ list: [ImportedToken]) -> ImportResult {
+        var contentKeys = Set<String>()
+        var secretsByID: [UUID: Data] = [:]
+        for token in tokens {
+            guard let secret = try? KeychainService.getSecret(for: token.id) else { continue }
+            secretsByID[token.id] = secret
+            contentKeys.insert(OTPStore.contentKey(token, secret: secret))
+        }
+        var usedIDs = Set(tokens.map(\.id))
 
-        var addedCount = 0
-
-        // создаём набор существующих ключей
-        let existingKeys: Set<String> = Set(tokens.compactMap { token in
-
-            guard let secret = try? KeychainService.getSecret(for: token.id) else {
-                return nil
-            }
-
-            let issuer = token.issuer
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-
-            let account = token.account
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-
-            let secretBase32 = Base32.encode(secret)
-
-            return "\(issuer)|\(account)|\(secretBase32)"
-        })
-
-        var mutableKeys = existingKeys
+        var added = 0
+        var duplicates = 0
+        var failed = 0
 
         for item in list {
-
-            let issuer = item.token.issuer
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-
-            let account = item.token.account
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-
-            let secretBase32 = Base32.encode(item.secret)
-
-            let key = "\(issuer)|\(account)|\(secretBase32)"
-
-            // duplicate
-            if mutableKeys.contains(key) {
+            let named = OTPStore.namedIfBlank(item.token)
+            let key = OTPStore.contentKey(named, secret: item.secret)
+            let sameTokenRenamed = secretsByID[named.id] == item.secret
+            if contentKeys.contains(key) || sameTokenRenamed {
+                duplicates += 1
                 continue
             }
 
-            // Persist the secret first; only count/add the token if it actually stuck.
-            // A failed keychain write must not leave a secret-less "------" token behind.
+            let token = usedIDs.contains(named.id) ? named.withNewID() : named
+
             do {
-                try KeychainService.setSecret(
-                    item.secret,
-                    for: item.token.id
-                )
+                try KeychainService.setSecret(item.secret, for: token.id)
             } catch {
+                failed += 1
                 continue
             }
 
-            secretCache[item.token.id] = item.secret
-            tokens.append(item.token)
-
-            mutableKeys.insert(key)
-
-            addedCount += 1
+            secretCache[token.id] = item.secret
+            tokens.append(token)
+            contentKeys.insert(key)
+            usedIDs.insert(token.id)
+            secretsByID[token.id] = item.secret
+            added += 1
         }
 
-        if addedCount > 0 {
+        if added > 0 {
             commit()
         }
 
-        return addedCount
+        return ImportResult(added: added, duplicates: duplicates, failed: failed)
+    }
+
+    static let unnamedIssuer = "Unnamed"
+
+    private static func namedIfBlank(_ token: OTPToken) -> OTPToken {
+        let isBlank = token.issuer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && token.account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard isBlank else { return token }
+        var named = token
+        named.issuer = unnamedIssuer
+        return named
+    }
+
+    private static func contentKey(_ token: OTPToken, secret: Data) -> String {
+        let issuer = token.issuer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let account = token.account.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return "\(issuer)|\(account)|\(Base32.encode(secret))"
     }
 
     func remove(_ tokenID: UUID) {
@@ -159,10 +163,13 @@ final class OTPStore: ObservableObject {
     }
 
     func rename(_ tokenID: UUID, issuer: String, account: String) {
-        guard let idx = tokens.firstIndex(where: { $0.id == tokenID }) else { return }
+        let newIssuer = issuer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newAccount = account.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !(newIssuer.isEmpty && newAccount.isEmpty),
+              let idx = tokens.firstIndex(where: { $0.id == tokenID }) else { return }
         var t = tokens[idx]
-        t.issuer = issuer.trimmingCharacters(in: .whitespacesAndNewlines)
-        t.account = account.trimmingCharacters(in: .whitespacesAndNewlines)
+        t.issuer = newIssuer
+        t.account = newAccount
         tokens[idx] = t
         commit()
     }
@@ -170,11 +177,15 @@ final class OTPStore: ObservableObject {
     func togglePin(_ tokenID: UUID) {
         guard let idx = tokens.firstIndex(where: { $0.id == tokenID }) else { return }
         var t = tokens[idx]
-        t.isPinned.toggle()
         if t.isPinned {
-            let minOrder = tokens.map(\.sortOrder).min() ?? 0
-            t.sortOrder = minOrder - 1
+            let lastUnpinned = tokens.filter { !$0.isPinned }.map(\.sortOrder).max() ?? 0
+            t.sortOrder = t.sortOrderBeforePin ?? lastUnpinned + 1
+            t.sortOrderBeforePin = nil
+        } else {
+            t.sortOrderBeforePin = t.sortOrder
+            t.sortOrder = (tokens.map(\.sortOrder).min() ?? 0) - 1
         }
+        t.isPinned.toggle()
         tokens[idx] = t
         commit()
     }
@@ -207,7 +218,7 @@ final class OTPStore: ObservableObject {
 
     func updateSecret(for token: OTPToken, base32: String) throws {
 
-        guard let decoded = Base32.decode(base32) else {
+        guard let decoded = Base32.decode(base32), !decoded.isEmpty else {
             throw ImportError.badBase32
         }
 
@@ -221,12 +232,13 @@ final class OTPStore: ObservableObject {
     
     // MARK: - Bulk
 
-    func removeAllTokens() {
-        for t in tokens {
-            try? KeychainService.deleteSecret(for: t.id)
-        }
+    func removeAllTokens() throws {
+        try KeychainService.removeAll()
         tokens.removeAll()
         secretCache.removeAll()
+        vaultCorrupted = false
+        keychainUnavailable = false
+        tokenListUnreadable = false
         commit()
     }
 

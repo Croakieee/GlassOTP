@@ -28,6 +28,8 @@ Get your one-time codes instantly — no full application window, no clutter, fu
 * Sensitive actions require system authentication (**Touch ID** or your macOS password):
   * Viewing or editing a secret key
   * Showing a token's QR code
+  * Exporting a backup
+  * Deleting all tokens
 * An optional **"Require Touch ID to view"** lock hides all codes until you authenticate.
 * Authentication is cached briefly to avoid repeated prompts during a session.
 * Backups are encrypted with **AES-GCM** using a key derived from your password (**PBKDF2-HMAC-SHA256**). Without the password, a backup file cannot be read.
@@ -100,7 +102,7 @@ Press **+** in the top-right corner. You can add tokens in several ways:
 
 ![Manual entry](screenshots/3.png)
 
-Duplicate tokens are detected automatically and skipped on import.
+Duplicate tokens are detected automatically and skipped on import. Entries GlassOTP can't generate codes for (HOTP or MD5 in a Google Authenticator export) are skipped and counted in the result message.
 
 ### Managing tokens
 
@@ -118,25 +120,33 @@ Right-click any token for quick actions:
 
 From the **right-click menu**:
 
-* **Export** — choose a location, set a password, and save an encrypted `.glassotp` backup of all tokens.
+* **Export** — authenticate, choose a location, set a password, and save an encrypted `.glassotp` backup of all tokens.
 * **Import** — select a `.glassotp` file and enter its password. Existing tokens are skipped, new ones are added.
+* **Delete All** — authenticate to remove every token and reset the secret storage.
 
 ### Settings
 
 Open the **settings menu** (slider icon) in the token list:
 
-* **Close after copy** — automatically close the popover shortly after copying a code.
+* **Close after copy** — automatically close the popover shortly after copying a code (a pinned popover stays open).
+* **Play sound on copy** — play a short sound when a code is copied.
 * **Require Touch ID to view** — lock the list until you authenticate.
 
 In the **right-click menu**:
 
-* **Launch at login** — start GlassOTP automatically when you log in. Enable it from the copy in your **Applications** folder; if you move the app later, turn the option on again.
+* **Launch at login** — start GlassOTP automatically when you log in. Enable it from the copy in your **Applications** folder; if you move the app later, turn the option on again. Turn it off before deleting the app.
 
 ## Notes & Limitations
 
 * GlassOTP supports **TOTP only** (time-based codes). HOTP (counter-based) tokens are not generated.
 * Code length is limited to **6 or 8 digits**.
 * Status messages (export/import/delete) use macOS notifications. If notifications are disabled for GlassOTP, the app shows a small in-app notice, and import errors are shown as a dialog.
+
+## Troubleshooting
+
+* **"No access to the Keychain"** — you declined the Keychain password prompt. Click **Retry** and allow access.
+* **"Secret storage is damaged"** — use **Delete All** in the right-click menu, then **Import** a backup. The damaged data is kept aside in the Keychain, not destroyed.
+* **"Some saved tokens couldn't be read"** — restore the missing tokens from a backup with **Import**.
 
 ## Building from Source
 
@@ -149,7 +159,7 @@ Requirements:
 git clone https://github.com/Croakieee/GlassOTP.git
 ```
 
-Open the project in Xcode and build normally.
+Open `GlassOTP.xcodeproj` in Xcode and build normally.
 
 ## Contributing
 

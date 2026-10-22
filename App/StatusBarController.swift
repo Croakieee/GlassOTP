@@ -11,6 +11,9 @@ final class StatusBarController: NSObject {
 
     private let store: OTPStore
 
+    private var autoCloseWork: DispatchWorkItem?
+    private static let autoCloseDelay: TimeInterval = 2.0
+
     init(popover: NSPopover, store: OTPStore) {
         self.popover = popover
         self.store = store
@@ -80,9 +83,19 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func handleAutoClose() {
-        if popover.isShown {
-            closePopover(sender: nil)
+        guard !appState.pinPopover else { return }
+        cancelAutoClose()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.closePopover(sender: nil)
         }
+        autoCloseWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autoCloseDelay, execute: work)
+    }
+
+    private func cancelAutoClose() {
+        autoCloseWork?.cancel()
+        autoCloseWork = nil
     }
 
     // While Touch ID / password auth is on screen, stop the popover from auto-closing
@@ -102,6 +115,8 @@ final class StatusBarController: NSObject {
     // Authoritative "popover closed" signal (fires for transient auto-close too, unlike
     // our closePopover). Drives the app lock's re-lock on close.
     @objc private func handlePopoverDidClose() {
+        store.timer.pause()
+        cancelAutoClose()
         NotificationCenter.default.post(name: .popoverDidClose, object: nil)
     }
 
@@ -199,30 +214,50 @@ final class StatusBarController: NSObject {
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
 
-        if alert.runModal() == .alertFirstButtonReturn {
-            let count = store.tokens.count
-            store.removeAllTokens()
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
 
-            NotificationService.shared.show(
-                title: "All tokens deleted",
-                body: "\(count) tokens removed"
-            )
+        DeviceAuth.authenticate(reason: "delete all your OTP tokens") { [weak self] granted in
+            guard granted else { return }
+            self?.performDeleteAll()
         }
     }
 
+    private func performDeleteAll() {
+        let count = store.tokens.count
+        do {
+            try store.removeAllTokens()
+        } catch {
+            showAlert(
+                title: "Couldn't delete tokens",
+                text: "The secret storage couldn't be reset: \(error.localizedDescription)"
+            )
+            return
+        }
+
+        NotificationService.shared.show(
+            title: "All tokens deleted",
+            body: "\(count) tokens removed"
+        )
+    }
+
     @objc private func exportTokens() {
+        DeviceAuth.authenticate(reason: "export all your OTP secrets to a backup file") { [weak self] granted in
+            guard granted else { return }
+            self?.performExport()
+        }
+    }
+
+    private func performExport() {
         let store = self.store
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "backup.glassotp"
+        panel.allowedFileTypes = ["glassotp"]
+        panel.isExtensionHidden = false
 
-        // runModal (not begin) + activate so the panel comes to the front of an accessory app
-        // instead of opening behind whatever window is currently active.
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         askPassword(confirm: true) { password in
-            // Snapshot on main, then derive the key (PBKDF2) and seal off-main so the UI
-            // doesn't freeze during export.
             let tokens = store.tokens
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
@@ -257,13 +292,10 @@ final class StatusBarController: NSObject {
         let panel = NSOpenPanel()
         panel.allowedFileTypes = ["glassotp"]
 
-        // runModal (not begin) + activate so the panel comes to the front of an accessory app
-        // instead of opening behind whatever window is currently active.
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         askPassword { password in
-            // Read + decrypt (PBKDF2) off-main; mutate the store back on main.
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let data = try Data(contentsOf: url)
@@ -274,15 +306,24 @@ final class StatusBarController: NSObject {
                     )
 
                     DispatchQueue.main.async {
-                        let added = store.addImportedMany(imported)
-                        let skipped = imported.count - added
+                        let result = store.addImportedMany(imported)
 
-                        if added > 0 {
+                        if result.failed > 0 {
+                            let hint = store.vaultCorrupted
+                                ? " The secret storage is damaged: use Delete All, then import the backup again."
+                                : ""
+                            self.showAlert(
+                                title: "Import incomplete",
+                                text: "\(result.failed) token(s) couldn't be saved to the Keychain.\(hint)"
+                            )
+                        }
+
+                        if result.added > 0 {
                             NotificationService.shared.show(
                                 title: "Import complete",
-                                body: "\(added) new token(s) added, \(skipped) skipped"
+                                body: "\(result.added) new token(s) added, \(result.duplicates) already existed"
                             )
-                        } else {
+                        } else if result.failed == 0 {
                             NotificationService.shared.show(
                                 title: "Import skipped",
                                 body: "All tokens already exist"
@@ -291,8 +332,6 @@ final class StatusBarController: NSObject {
                     }
 
                 } catch {
-                    // Wrong password / corrupted file: show a modal alert, not a notification —
-                    // the user must see this even if notifications are disabled.
                     DispatchQueue.main.async {
                         self.showAlert(
                             title: "Import failed",
@@ -304,7 +343,6 @@ final class StatusBarController: NSObject {
         }
     }
 
-    /// Modal alert for feedback that must be seen regardless of notification permission.
     private func showAlert(title: String, text: String) {
         let alert = NSAlert()
         alert.messageText = title
@@ -323,15 +361,12 @@ final class StatusBarController: NSObject {
             alert.informativeText = errorText
         }
 
-        // Build the accessory with explicit frames instead of an NSStackView: inside an
-        // NSAlert the stack view's intrinsic sizing collapsed the secure fields to a sliver.
         let fieldWidth: CGFloat = 240
         let fieldHeight: CGFloat = 24
 
         let pwField: NSSecureTextField
         let confirmField: NSSecureTextField?
         if confirm {
-            // Fixed-size container, top field = password, bottom field = repeat.
             let spacing: CGFloat = 8
             let container = NSView(frame: NSRect(x: 0, y: 0, width: fieldWidth, height: fieldHeight * 2 + spacing))
 
@@ -371,12 +406,11 @@ final class StatusBarController: NSObject {
                 askPassword(confirm: true, errorText: "Passwords don't match. Try again.", completion: completion)
                 return
             }
-            // Warn (but allow) on a short password: the backup holds every secret.
             if password.count < 8 {
                 let warn = NSAlert()
                 warn.messageText = "Weak password"
                 warn.informativeText = "This password is shorter than 8 characters. The backup contains all your secrets. Use it anyway?"
-                warn.addButton(withTitle: "Change")      // default — the safer choice
+                warn.addButton(withTitle: "Change")
                 warn.addButton(withTitle: "Use anyway")
                 NSApp.activate(ignoringOtherApps: true)
                 if warn.runModal() == .alertFirstButtonReturn {
@@ -422,6 +456,7 @@ final class StatusBarController: NSObject {
     private func showPopover(sender: Any?) {
         guard let button = statusItem.button else { return }
 
+        cancelAutoClose()
         store.timer.resume()
 
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)

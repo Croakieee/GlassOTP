@@ -15,13 +15,11 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(onAddMany: @escaping ([ImportedToken]) -> Int) {
+    func show(onAddMany: @escaping ([ImportedToken]) -> ImportResult) {
         // .accessory apps can't properly bring windows to front without switching to .regular.
         NSApp.setActivationPolicy(.regular)
 
         if let win = window {
-            // Reuse the open window, but refresh the callback so a stale closure from an
-            // earlier show() can't be invoked.
             hosting?.rootView = AddTokenSheet(
                 onAddMany: onAddMany,
                 onClose: { [weak self] in self?.window?.close() }
