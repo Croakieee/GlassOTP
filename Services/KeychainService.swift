@@ -44,10 +44,15 @@ struct KeychainService {
     private static let vaultAccount = "GlassOTP.vault.v1"
     /// Legacy per-token account prefix (pre-consolidation). Used only for one-time migration.
     private static let legacyPrefix = "token."
+    private static let damagedVaultAccount = "GlassOTP.vault.v1.damaged"
 
     /// In-memory vault: `uuidString` -> secret. `nil` means "not loaded from keychain yet".
     private static var vault: [String: Data]?
     private static let lock = NSLock()
+
+    private static var pendingLegacyAccounts: [String] = []
+
+    private static var loadFailure: Error?
 
     /// Legacy per-token account name. Retained for reference / migration; the format of the
     /// items the migration reads.
@@ -84,11 +89,6 @@ struct KeychainService {
         }
     }
 
-    /// UUID strings that currently have a stored secret in the vault.
-    ///
-    /// Throws if the vault can't be read (corruption / keychain access failure). Callers must
-    /// treat a throw as "unknown — keep everything", never as "nothing present", otherwise a
-    /// transient failure would look like every token lost its secret.
     static func storedSecretIDs() throws -> Set<String> {
         lock.lock()
         defer { lock.unlock() }
@@ -96,17 +96,45 @@ struct KeychainService {
         return Set((vault ?? [:]).keys)
     }
 
+    static func removeAll() throws {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let raw = try readItemData(account: vaultAccount),
+           (try? JSONDecoder().decode([String: Data].self, from: raw)) == nil {
+            try writeItem(account: damagedVaultAccount, data: raw)
+        }
+
+        deleteItems(accounts: [vaultAccount] + legacyAccounts())
+        vault = [:]
+        pendingLegacyAccounts = []
+        loadFailure = nil
+        try persistVaultLocked()
+    }
+
+    static func retryAccess() {
+        lock.lock()
+        defer { lock.unlock() }
+        loadFailure = nil
+    }
+
     // MARK: - Vault load / persist (caller must hold `lock`)
 
     private static func loadVaultLocked() throws {
         if vault != nil { return }
+        if let loadFailure { throw loadFailure }
 
+        do {
+            try readVaultLocked()
+        } catch {
+            loadFailure = error
+            throw error
+        }
+    }
+
+    private static func readVaultLocked() throws {
         // 1) Try the consolidated blob.
         if let data = try readItemData(account: vaultAccount) {
-            // The blob exists. If it fails to decode (corruption / partial write / future
-            // schema), DO NOT fall back to an empty dict: that would make the next write
-            // overwrite the still-intact blob and lose every secret. Throw instead, leaving
-            // the keychain item untouched so the situation stays recoverable.
             guard let decoded = try? JSONDecoder().decode([String: Data].self, from: data) else {
                 throw KeychainError.decode
             }
@@ -115,17 +143,29 @@ struct KeychainService {
         }
 
         // 2) No blob yet → migrate legacy per-token items (one-time), then persist as one blob.
-        vault = migrateLegacyItems()
+        let legacy = readLegacyItems()
+        vault = legacy.secrets
+        pendingLegacyAccounts = legacy.accounts
         try? persistVaultLocked()
     }
 
     private static func persistVaultLocked() throws {
         let data = try JSONEncoder().encode(vault ?? [:])
+        try writeItem(account: vaultAccount, data: data)
 
+        if !pendingLegacyAccounts.isEmpty {
+            deleteItems(accounts: pendingLegacyAccounts)
+            pendingLegacyAccounts = []
+        }
+    }
+
+    // MARK: - Raw item helpers
+
+    private static func writeItem(account: String, data: Data) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: vaultAccount
+            kSecAttrAccount as String: account
         ]
         let attrs: [String: Any] = [
             kSecValueData as String: data,
@@ -143,7 +183,16 @@ struct KeychainService {
         if addStatus != errSecSuccess { throw KeychainError.add(addStatus) }
     }
 
-    // MARK: - Raw item helpers
+    private static func deleteItems(accounts: [String]) {
+        for account in accounts {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
+    }
 
     /// Reads a single item's data. Returns `nil` only when the item doesn't exist.
     /// Reading the data may trigger the ACL prompt (this is where the password dialog appears).
@@ -170,13 +219,7 @@ struct KeychainService {
 
     // MARK: - One-time migration from per-token items
 
-    /// Folds every legacy `token.<uuid>` item into a single dictionary.
-    ///
-    /// Enumerating accounts (attributes only, no data) does NOT prompt. Reading each item's
-    /// *data* does — that's the unavoidable one-time cost of moving secrets created under the
-    /// old per-item ACLs. Successfully migrated items are deleted so they never prompt again,
-    /// and so they don't leave duplicate secrets behind.
-    private static func migrateLegacyItems() -> [String: Data] {
+    private static func legacyAccounts() -> [String] {
         let listQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -186,34 +229,22 @@ struct KeychainService {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(listQuery as CFDictionary, &result)
         guard status == errSecSuccess, let items = result as? [[String: Any]] else {
-            return [:]
+            return []
         }
+        return items
+            .compactMap { $0[kSecAttrAccount as String] as? String }
+            .filter { $0.hasPrefix(legacyPrefix) }
+    }
 
-        var migrated: [String: Data] = [:]
-        var accountsToDelete: [String] = []
+    private static func readLegacyItems() -> (secrets: [String: Data], accounts: [String]) {
+        var secrets: [String: Data] = [:]
+        var accounts: [String] = []
 
-        for attrs in items {
-            guard let account = attrs[kSecAttrAccount as String] as? String,
-                  account.hasPrefix(legacyPrefix) else { continue }
-
-            let uuidString = String(account.dropFirst(legacyPrefix.count))
-
-            // Reading the data here is what surfaces the per-item prompt (one-time).
-            if let data = (try? readItemData(account: account)) ?? nil {
-                migrated[uuidString] = data
-                accountsToDelete.append(account)
-            }
+        for account in legacyAccounts() {
+            guard let data = (try? readItemData(account: account)) ?? nil else { continue }
+            secrets[String(account.dropFirst(legacyPrefix.count))] = data
+            accounts.append(account)
         }
-
-        for account in accountsToDelete {
-            let delQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecAttrAccount as String: account
-            ]
-            SecItemDelete(delQuery as CFDictionary)
-        }
-
-        return migrated
+        return (secrets, accounts)
     }
 }

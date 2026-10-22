@@ -56,7 +56,7 @@ struct BackupService {
         let payload = try JSONDecoder().decode([BackupToken].self, from: decrypted)
 
         return try payload.map { item in
-            guard let secret = Data(base64Encoded: item.secret) else {
+            guard let secret = Data(base64Encoded: item.secret), !secret.isEmpty else {
                 throw BackupError.corruptedPayload
             }
             return ImportedToken(token: item.token, secret: secret)

@@ -1,1 +1,16 @@
+# macOS
 .DS_Store
+
+# Xcode — personal state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Build output
+DerivedData/
+build/
+.build/
+
+# Local signing overrides
+Local.xcconfig

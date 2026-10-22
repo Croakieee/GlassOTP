@@ -1,5 +1,4 @@
 import SwiftUI
-import LocalAuthentication
 import Combine
 import UserNotifications
 
@@ -7,7 +6,6 @@ private struct RenameHandle: Identifiable, Equatable { let id: UUID }
 
 struct RootPopoverView: View {
 
-    // Owned by AppDelegate and injected, so the same instance backs the status-bar menu.
     @ObservedObject private var store: OTPStore
     @ObservedObject private var appState = AppState.shared
 
@@ -38,8 +36,11 @@ struct RootPopoverView: View {
     @State private var deleteTokenID: UUID?
     @State private var showDeleteAlert: Bool = false
 
-    // compact in-UI notice when notifications are off (so missing export/import banners are explained)
     @State private var notificationsDenied: Bool = false
+
+    @State private var keyboardActive: Bool = false
+    @State private var selectedID: UUID?
+    @State private var keyboardCopiedID: UUID?
 
     var body: some View {
 
@@ -57,6 +58,9 @@ struct RootPopoverView: View {
                     store: store,
                     timer: store.timer,
                     autoCloseOnCopy: $appState.autoCloseOnCopy,
+                    playsCopySound: appState.playSoundOnCopy,
+                    selectedID: highlightedID,
+                    keyboardCopiedID: keyboardCopiedID,
                     onPin: { id in store.togglePin(id) },
                     onRename: { id in beginRename(id) },
                     onEditSecret: { id in beginEditSecret(id) },
@@ -71,8 +75,6 @@ struct RootPopoverView: View {
 
         }
         // Snug padding: close to the rounded edges but with a little breathing room.
-        // No bottom padding: the list runs to the popover's bottom edge so a partially
-        // visible row hints that there is more to scroll.
         .padding(.horizontal, 6)
         .padding(.top, 8)
         // Single rounded card that fills the popover: content + material are clipped to the
@@ -89,11 +91,27 @@ struct RootPopoverView: View {
             applyLockOnOpen()
             refreshNotificationStatus()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
             applyLockOnOpen()
             refreshNotificationStatus()
+            keyboardActive = note.userInfo?[PopoverUserInfo.openedViaHotKey] as? Bool ?? false
+            selectedID = store.filteredTokens().first?.id
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .popoverKeyCommand)) { note in
+            guard let command = note.object as? PopoverKeyCommand else { return }
+            handleKey(command)
+        }
+        .onChange(of: store.query) { query in
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                keyboardActive = true
+            }
+            selectedID = store.filteredTokens().first?.id
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidClose)) { _ in
+            store.query = ""
+            keyboardActive = false
+            selectedID = nil
+            keyboardCopiedID = nil
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
@@ -181,6 +199,8 @@ struct RootPopoverView: View {
 
             Menu {
                 Toggle("Close after copy", isOn: $appState.autoCloseOnCopy)
+                Toggle("Play sound on copy", isOn: $appState.playSoundOnCopy)
+                Toggle("Global shortcut ⌥⌘O", isOn: $appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
             } label: {
                 Image(systemName: "slider.horizontal.3")
@@ -206,14 +226,32 @@ struct RootPopoverView: View {
         }
     }
 
-    // MARK: Warnings
-
     @ViewBuilder
     private var warnings: some View {
         if store.vaultCorrupted {
             warningLine(
                 icon: "exclamationmark.triangle.fill",
-                text: "Secret storage looks damaged. Restore from a backup.",
+                text: "Secret storage is damaged. Use Delete All in the menu, then import a backup.",
+                color: .orange
+            )
+        }
+        if store.keychainUnavailable {
+            HStack(spacing: 0) {
+                warningLine(
+                    icon: "exclamationmark.triangle.fill",
+                    text: "No access to the Keychain, so codes can't be shown.",
+                    color: .orange
+                )
+                Button("Retry", action: retryKeychainAccess)
+                    .buttonStyle(BorderlessButtonStyle())
+                    .font(.footnote)
+                    .padding(.trailing, 6)
+            }
+        }
+        if store.tokenListUnreadable {
+            warningLine(
+                icon: "exclamationmark.triangle.fill",
+                text: "Some saved tokens couldn't be read. Restore missing ones from a backup.",
                 color: .orange
             )
         }
@@ -238,7 +276,12 @@ struct RootPopoverView: View {
         .padding(.horizontal, 6)
     }
 
-    /// Refresh whether notifications are denied, so the compact notice reflects current state.
+    private func retryKeychainAccess() {
+        NotificationCenter.default.post(name: .lockAuthBegan, object: nil)
+        store.retryKeychainAccess()
+        NotificationCenter.default.post(name: .lockAuthEnded, object: nil)
+    }
+
     private func refreshNotificationStatus() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             let denied = settings.authorizationStatus == .denied
@@ -351,34 +394,60 @@ struct RootPopoverView: View {
             return
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-
-        let context = LAContext()
-        var error: NSError?
-
-        let reason = "Authenticate to access protected OTP data"
-
-        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-
-            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { success, _ in
-
-                DispatchQueue.main.async {
-
-                    if success {
-                        lastAuthTime = Date()
-                    }
-
-                    completion(success)
-                }
-
+        DeviceAuth.authenticate(reason: "access your protected OTP data") { success in
+            if success {
+                lastAuthTime = Date()
             }
-
-        } else {
-            completion(true)
+            completion(success)
         }
     }
 
     // MARK: Actions
+
+    private var highlightedID: UUID? {
+        guard keyboardActive else { return nil }
+        let items = store.filteredTokens()
+        if let selectedID, items.contains(where: { $0.id == selectedID }) {
+            return selectedID
+        }
+        return items.first?.id
+    }
+
+    private func handleKey(_ command: PopoverKeyCommand) {
+        guard showContent else {
+            if command == .enter { promptUnlock() }
+            return
+        }
+        let items = store.filteredTokens()
+        guard !items.isEmpty else { return }
+        guard keyboardActive else {
+            keyboardActive = true
+            selectedID = items.first?.id
+            return
+        }
+
+        let current = items.firstIndex { $0.id == highlightedID } ?? 0
+        switch command {
+        case .up:
+            selectedID = items[max(current - 1, 0)].id
+        case .down:
+            selectedID = items[min(current + 1, items.count - 1)].id
+        case .enter:
+            copyWithKeyboard(items[current])
+        }
+    }
+
+    private func copyWithKeyboard(_ token: OTPToken) {
+        guard let code = store.code(for: token) else { return }
+        CodeClipboard.copy(code, playSound: appState.playSoundOnCopy)
+        keyboardCopiedID = token.id
+        NotificationCenter.default.post(name: .keyboardCopyDone, object: nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if keyboardCopiedID == token.id {
+                keyboardCopiedID = nil
+            }
+        }
+    }
 
     private func beginRename(_ id: UUID) {
 

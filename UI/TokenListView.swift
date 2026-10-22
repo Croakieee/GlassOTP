@@ -1,12 +1,8 @@
 import SwiftUI
 
-/// Frame of the scrolled content in the scroll view's coordinate space
-/// (minY goes negative as the list scrolls down).
 private struct ScrollContentFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        // Siblings that don't set the key contribute the default (.zero); taking the last
-        // value blindly would overwrite the real frame with it.
         let next = nextValue()
         if next != .zero { value = next }
     }
@@ -16,8 +12,10 @@ struct TokenListView: View {
     @ObservedObject var store: OTPStore
     @ObservedObject var timer: TimeStepTimer
     @Binding var autoCloseOnCopy: Bool
+    let playsCopySound: Bool
+    let selectedID: UUID?
+    let keyboardCopiedID: UUID?
 
-    // Drives the custom scroll indicator.
     @State private var contentFrame: CGRect = .zero
 
     private let scrollSpace = "tokenScroll"
@@ -32,39 +30,39 @@ struct TokenListView: View {
         let items = store.filteredTokens()
 
         if items.isEmpty {
-            VStack(spacing: 10) {
-                Spacer()
-                Image(systemName: "qrcode")
-                    .font(.system(size: 44))
-                    .foregroundColor(.secondary)
-                Text("No tokens yet")
-                    .font(.callout)
-                    .foregroundColor(.secondary)
-                Text("Tap “+” and add an otpauth:// link or import a QR code.")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 16)
-                Spacer()
+            if store.tokens.isEmpty {
+                emptyState(
+                    icon: "qrcode",
+                    title: "No tokens yet",
+                    hint: "Tap “+” and add an otpauth:// link or import a QR code."
+                )
+            } else {
+                emptyState(
+                    icon: "magnifyingglass",
+                    title: "No matches",
+                    hint: "No account matches “\(store.query.trimmingCharacters(in: .whitespacesAndNewlines))”."
+                )
             }
         } else {
             GeometryReader { viewport in
-            // The system scroller is hidden: its width depends on the user's "Show scroll
-            // bars" setting / connected mouse and can't be styled from SwiftUI on macOS 11
-            // (.scrollIndicators is 13+). A fixed thin indicator is drawn as an overlay instead.
+            ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVStack(spacing: 10) {
                     ForEach(items) { token in
+                        let remaining = store.remaining(for: token)
                         TokenRowView(
                             title: token.displayTitle,
                             code: store.code(for: token),
-                            remaining: store.remaining(for: token),
-                            period: token.period
+                            nextCode: remaining <= TokenRowView.nextCodeThreshold ? store.nextCode(for: token) : nil,
+                            digits: token.digits,
+                            remaining: remaining,
+                            period: token.period,
+                            playsSound: playsCopySound,
+                            isSelected: token.id == selectedID,
+                            copiedExternally: token.id == keyboardCopiedID
                         ) {
                             if autoCloseOnCopy {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                    NotificationCenter.default.post(name: .autoClosePopover, object: nil)
-                                }
+                                NotificationCenter.default.post(name: .autoClosePopover, object: nil)
                             }
                         }
                         .contextMenu {
@@ -90,10 +88,9 @@ struct TokenListView: View {
                                 onDelete(token.id)
                             }
                         }
+                        .id(token.id)
                     }
                 }
-                // Narrow right gutter for the custom indicator. Bottom padding gives the last
-                // row breathing room now that the list runs to the popover's bottom edge.
                 .padding(.top, 2)
                 .padding(.bottom, 6)
                 .padding(.trailing, 8)
@@ -112,14 +109,35 @@ struct TokenListView: View {
                 scrollIndicator(viewportHeight: viewport.size.height),
                 alignment: .topTrailing
             )
+            .onChange(of: selectedID) { id in
+                guard let id else { return }
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    proxy.scrollTo(id)
+                }
+            }
+            }
             }
         }
     }
 
-    // MARK: - Scroll indicator
+    private func emptyState(icon: String, title: String, hint: String) -> some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: icon)
+                .font(.system(size: 44))
+                .foregroundColor(.secondary)
+            Text(title)
+                .font(.callout)
+                .foregroundColor(.secondary)
+            Text(hint)
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+            Spacer()
+        }
+    }
 
-    /// Thin, fixed-width indicator shown only when the list overflows. Display-only
-    /// (scrolling is by wheel / trackpad), so it never intercepts clicks.
     @ViewBuilder
     private func scrollIndicator(viewportHeight: CGFloat) -> some View {
         let contentHeight = contentFrame.height

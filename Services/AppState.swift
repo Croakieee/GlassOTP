@@ -7,6 +7,8 @@ final class AppState: ObservableObject {
     private let pinKey = "GlassOTP.pinPopover"
     private let autoCloseKey = "GlassOTP.autoCloseOnCopy"
     private let requireUnlockKey = "GlassOTP.requireUnlock"
+    private let copySoundKey = "GlassOTP.playSoundOnCopy"
+    private let globalHotKeyKey = "GlassOTP.globalHotKey"
 
     @Published var pinPopover: Bool {
         didSet { UserDefaults.standard.set(pinPopover, forKey: pinKey) }
@@ -22,23 +24,24 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(requireUnlock, forKey: requireUnlockKey) }
     }
 
+    @Published var playSoundOnCopy: Bool {
+        didSet { UserDefaults.standard.set(playSoundOnCopy, forKey: copySoundKey) }
+    }
+
+    @Published var globalHotKeyEnabled: Bool {
+        didSet { UserDefaults.standard.set(globalHotKeyEnabled, forKey: globalHotKeyKey) }
+    }
+
     private init() {
         self.pinPopover = UserDefaults.standard.bool(forKey: pinKey)
         // Default ON to preserve existing behaviour; `object(forKey:)` distinguishes "unset" from "false".
         self.autoCloseOnCopy = UserDefaults.standard.object(forKey: autoCloseKey) as? Bool ?? true
         self.requireUnlock = UserDefaults.standard.object(forKey: requireUnlockKey) as? Bool ?? false
+        self.playSoundOnCopy = UserDefaults.standard.object(forKey: copySoundKey) as? Bool ?? true
+        self.globalHotKeyEnabled = UserDefaults.standard.object(forKey: globalHotKeyKey) as? Bool ?? true
     }
 }
 
-// MARK: - Launch at login
-
-/// Launch-at-login via a per-user LaunchAgent plist in ~/Library/LaunchAgents.
-///
-/// Why this mechanism: it works the same on macOS 11.7 through current releases and needs no
-/// helper target or Team-ID signing (SMAppService is 13+, SMLoginItemSetEnabled needs a signed
-/// helper bundle). The sandbox allows it through the
-/// `temporary-exception.files.home-relative-path.read-write` entitlement for
-/// `/Library/LaunchAgents/`. launchd reads the folder at login, so nothing has to be loaded now.
 enum LoginItem {
 
     enum Failure: LocalizedError {
@@ -57,7 +60,6 @@ enum LoginItem {
 
     private static let label = "com.glassotp.loginitem"
 
-    /// The plist lives in the REAL home folder — NSHomeDirectory() is the sandbox container.
     private static var plistURL: URL? {
         guard let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir else { return nil }
         return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
@@ -65,8 +67,6 @@ enum LoginItem {
             .appendingPathComponent("\(label).plist")
     }
 
-    /// Enabled only if the plist exists AND points at this copy of the app, so a moved or
-    /// replaced app shows as off and re-enabling rewrites the path.
     static var isEnabled: Bool {
         guard let url = plistURL,
               let dict = NSDictionary(contentsOf: url),
@@ -84,8 +84,6 @@ enum LoginItem {
         }
 
         guard let executable = Bundle.main.executablePath else { throw Failure.noExecutable }
-        // A quarantined app run from Downloads executes from a random read-only path that
-        // won't exist at the next login.
         guard !executable.contains("/AppTranslocation/") else { throw Failure.translocated }
 
         var plist: [String: Any] = [
@@ -94,15 +92,12 @@ enum LoginItem {
             "RunAtLoad": true,
             "LimitLoadToSessionType": "Aqua"
         ]
-        // Lets macOS 13+ show the entry under the app's name in Login Items (ignored on 11–12).
         if let bundleID = Bundle.main.bundleIdentifier {
             plist["AssociatedBundleIdentifiers"] = [bundleID]
         }
 
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
-        // Non-atomic on purpose: an atomic write stages a temp file outside the one folder the
-        // sandbox exception covers.
         try data.write(to: url)
     }
 }
