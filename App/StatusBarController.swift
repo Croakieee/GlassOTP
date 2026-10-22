@@ -17,6 +17,8 @@ final class StatusBarController: NSObject {
 
     private var hotKey: GlobalHotKey?
     private var hotKeyCancellable: AnyCancellable?
+    private var sortCancellable: AnyCancellable?
+    private var hotpCancellable: AnyCancellable?
     private var keyMonitor: Any?
     private var appToRestore: NSRunningApplication?
 
@@ -92,6 +94,14 @@ final class StatusBarController: NSObject {
             self?.setHotKey(enabled: enabled)
         }
 
+        sortCancellable = appState.$sortByUsage.sink { [weak self] enabled in
+            self?.store.sortByUsage = enabled
+        }
+
+        hotpCancellable = appState.$hotpAdvancesOnCopy.sink { [weak self] enabled in
+            self?.store.hotpAdvancesOnCopy = enabled
+        }
+
         store.timer.pause()
     }
 
@@ -100,6 +110,8 @@ final class StatusBarController: NSObject {
         removeKeyMonitor()
         cancellable?.cancel()
         hotKeyCancellable?.cancel()
+        sortCancellable?.cancel()
+        hotpCancellable?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -146,6 +158,8 @@ final class StatusBarController: NSObject {
     // our closePopover). Drives the app lock's re-lock on close.
     @objc private func handlePopoverDidClose() {
         store.timer.pause()
+        store.refreshOrder()
+        store.purgeExpiredTrash()
         cancelAutoClose()
         removeKeyMonitor()
         restorePreviousApp()
@@ -367,59 +381,75 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func importTokens() {
-        let store = self.store
         let panel = NSOpenPanel()
-        panel.allowedFileTypes = ["glassotp"]
+        panel.allowedFileTypes = FileImportService.fileTypes
+        panel.canChooseDirectories = true
+        panel.message = "Choose a GlassOTP backup, an export from 2FAS, Aegis, Authenticator Pro or Bitwarden, a Steam Desktop Authenticator .maFile or maFiles folder, or a text file with otpauth:// links."
 
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
-        askPassword { password in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let data = try Data(contentsOf: url)
+        let plan: FileImportPlan
+        do {
+            plan = try FileImportService.plan(for: url)
+        } catch {
+            showAlert(title: "Import failed", text: Self.importErrorText(error))
+            return
+        }
 
-                    let imported = try BackupService.import(
-                        data: data,
-                        password: password
-                    )
+        guard let prompt = plan.passwordPrompt else {
+            runImport(plan, password: nil)
+            return
+        }
+        askPassword(title: prompt) { password in
+            self.runImport(plan, password: password)
+        }
+    }
 
-                    DispatchQueue.main.async {
-                        let result = store.addImportedMany(imported)
-
-                        if result.failed > 0 {
-                            let hint = store.vaultCorrupted
-                                ? " The secret storage is damaged: use Delete All, then import the backup again."
-                                : ""
-                            self.showAlert(
-                                title: "Import incomplete",
-                                text: "\(result.failed) token(s) couldn't be saved to the Keychain.\(hint)"
-                            )
-                        }
-
-                        if result.added > 0 {
-                            NotificationService.shared.show(
-                                title: "Import complete",
-                                body: "\(result.added) new token(s) added, \(result.duplicates) already existed"
-                            )
-                        } else if result.failed == 0 {
-                            NotificationService.shared.show(
-                                title: "Import skipped",
-                                body: "All tokens already exist"
-                            )
-                        }
-                    }
-
-                } catch {
-                    DispatchQueue.main.async {
-                        self.showAlert(
-                            title: "Import failed",
-                            text: "Wrong password or corrupted file."
-                        )
-                    }
+    private func runImport(_ plan: FileImportPlan, password: String?) {
+        let store = self.store
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let parsed = try plan.read(password)
+                DispatchQueue.main.async {
+                    self.reportImport(store.addImportedMany(parsed.tokens), unreadable: parsed.unsupported)
+                }
+            } catch {
+                let text = Self.importErrorText(error)
+                DispatchQueue.main.async {
+                    self.showAlert(title: "Import failed", text: text)
                 }
             }
         }
+    }
+
+    private func reportImport(_ result: ImportResult, unreadable: Int) {
+        if result.failed > 0 {
+            let hint = store.vaultCorrupted
+                ? " The secret storage is damaged: use Delete All, then import the backup again."
+                : ""
+            showAlert(
+                title: "Import incomplete",
+                text: "\(result.failed) token(s) couldn't be saved to the Keychain.\(hint)"
+            )
+        }
+
+        let skipped = unreadable > 0 ? ", \(unreadable) couldn't be read" : ""
+        if result.added > 0 {
+            NotificationService.shared.show(
+                title: "Import complete",
+                body: "\(result.added) new token(s) added, \(result.duplicates) already existed\(skipped)"
+            )
+        } else if result.failed == 0 {
+            NotificationService.shared.show(
+                title: "Import skipped",
+                body: "All tokens already exist\(skipped)"
+            )
+        }
+    }
+
+    private static func importErrorText(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? "Wrong password or corrupted file."
     }
 
     private func showAlert(title: String, text: String) {
@@ -432,10 +462,11 @@ final class StatusBarController: NSObject {
     }
 
     private func askPassword(confirm: Bool = false,
+                             title: String? = nil,
                              errorText: String? = nil,
                              completion: @escaping (String) -> Void) {
         let alert = NSAlert()
-        alert.messageText = confirm ? "Set backup password" : "Enter password"
+        alert.messageText = title ?? (confirm ? "Set backup password" : "Enter password")
         if let errorText = errorText {
             alert.informativeText = errorText
         }

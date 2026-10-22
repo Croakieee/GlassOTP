@@ -4,6 +4,10 @@ struct TOTPGenerator {
     static func code(for date: Date, token: OTPToken, secret: Data) -> String {
         // Шаг счётчика
         let counter = UInt64(floor(date.timeIntervalSince1970 / Double(token.period)))
+        return code(counter: counter, token: token, secret: secret)
+    }
+
+    static func code(counter: UInt64, token: OTPToken, secret: Data) -> String {
         // 8 байт big-endian
         var be = counter.bigEndian
         let msg = withUnsafeBytes(of: &be) { Data($0) }
@@ -22,6 +26,9 @@ struct TOTPGenerator {
         let p3 = UInt32(digest[offset + 3])
 
         let bin = (p0 << 24) | (p1 << 16) | (p2 << 8) | p3
+        if token.kind == .steam {
+            return steamCode(bin)
+        }
         let mod = pow10(token.digits)
         let val = bin % mod
 
@@ -35,6 +42,18 @@ struct TOTPGenerator {
         let s = Int(date.timeIntervalSince1970)
         let rem = period - (s % period)
         return rem == period ? period : rem
+    }
+
+    private static let steamAlphabet = Array("23456789BCDFGHJKMNPQRTVWXY")
+
+    private static func steamCode(_ value: UInt32) -> String {
+        var rest = Int(value)
+        var code = ""
+        for _ in 0..<OTPKind.steamDigits {
+            code.append(steamAlphabet[rest % steamAlphabet.count])
+            rest /= steamAlphabet.count
+        }
+        return code
     }
 
     private static func pow10(_ n: Int) -> UInt32 {

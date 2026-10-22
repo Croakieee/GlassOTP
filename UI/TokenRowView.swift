@@ -14,9 +14,15 @@ enum CodeClipboard {
     }
 }
 
+struct CopiedCode: Equatable {
+    let id: UUID
+    let code: String
+}
+
 struct TokenRowView: View {
     static let nextCodeThreshold = 5
     static let copiedFeedbackDuration: TimeInterval = 2.0
+    private static let steamTint = Color(red: 0.4, green: 0.75, blue: 0.96)
     private static let codeChangeAnimation = Animation.spring(response: 0.35, dampingFraction: 0.8)
 
     let title: String
@@ -27,12 +33,18 @@ struct TokenRowView: View {
     let period: Int
     let playsSound: Bool
     let isSelected: Bool
-    let copiedExternally: Bool
+    let externallyCopiedCode: String?
+    let isLocked: Bool
+    var kind: OTPKind = .totp
+    var counter: UInt64? = nil
+    var onAdvance: () -> Void = {}
+    let onUnlock: () -> Void
     let onCopy: () -> Void
 
-    @State private var copied = false
+    @State private var copiedCode: String?
     @State private var hoveringRow = false
     @State private var hoveringNext = false
+    @State private var hoveringCounter = false
     @State private var pulse = false
 
     // Цвет таймера
@@ -43,11 +55,15 @@ struct TokenRowView: View {
     }
 
     private var showsCopied: Bool {
-        copied || copiedExternally
+        copiedCode != nil || externallyCopiedCode != nil
+    }
+
+    private var shownCode: String? {
+        externallyCopiedCode ?? copiedCode ?? code
     }
 
     private var targetsCurrentCode: Bool {
-        hoveringRow && !hoveringNext && code != nil
+        hoveringRow && !hoveringNext && !hoveringCounter && (code != nil || isLocked)
     }
 
     private var currentCodeOpacity: Double {
@@ -72,25 +88,41 @@ struct TokenRowView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
 
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .help(title)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .help(title)
+
+                    switch kind {
+                    case .hotp:
+                        KindTag(text: "HOTP", tint: .purple, hint: "Counter-based code: changes when you use it or press ↻")
+                    case .steam:
+                        KindTag(text: "STEAM", tint: Self.steamTint, hint: "Steam Guard code")
+                    case .totp:
+                        EmptyView()
+                    }
+                }
 
                 HStack(spacing: 8) {
 
-                    ZStack(alignment: .leading) {
-                        Text(Self.grouped(code ?? String(repeating: "-", count: digits)))
-                            .font(.system(size: 20, weight: .medium, design: .monospaced))
-                            .foregroundColor(code == nil ? .secondary : .primary)
-                            .opacity(currentCodeOpacity)
-                            .id(code)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .opacity
-                            ))
+                    if isLocked {
+                        lockedCode
+                    } else {
+                        ZStack(alignment: .leading) {
+                            Text(Self.grouped(shownCode ?? String(repeating: "-", count: digits)))
+                                .font(.system(size: 20, weight: .medium, design: .monospaced))
+                                .foregroundColor(shownCode == nil ? .secondary : .primary)
+                                .opacity(currentCodeOpacity)
+                                .id(shownCode)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                        }
+                        .transition(.opacity)
                     }
 
                     if showsCopied {
@@ -99,7 +131,7 @@ struct TokenRowView: View {
                             .foregroundColor(.green)
                             .font(.system(size: 12, weight: .semibold))
                             .transition(.opacity.combined(with: .scale))
-                    } else if let nextCode {
+                    } else if let nextCode, !isLocked {
                         NextCodeChip(
                             code: nextCode,
                             playsSound: playsSound,
@@ -113,36 +145,18 @@ struct TokenRowView: View {
                         ))
                     }
                 }
-                .animation(Self.codeChangeAnimation, value: code)
+                .animation(Self.codeChangeAnimation, value: shownCode)
                 .animation(Self.codeChangeAnimation, value: nextCode)
+                .animation(.easeInOut(duration: 0.2), value: isLocked)
                 .animation(.easeInOut(duration: 0.15), value: hoveringNext)
             }
 
             Spacer()
 
-            // Красивый таймер
-            ZStack {
-
-                Circle()
-                    .stroke(Color.secondary.opacity(0.25), lineWidth: 4)
-                    .frame(width: 26, height: 26)
-
-                Circle()
-                    .trim(from: 0, to: CGFloat(max(0.0, Double(remaining) / Double(period))))
-                    .rotation(.degrees(-90))
-                    .stroke(
-                        timerColor,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 26, height: 26)
-                    .scaleEffect(pulse && remaining <= 5 ? 1.12 : 1.0)
-                    .shadow(color: timerColor.opacity(remaining <= 5 ? 0.8 : 0),
-                            radius: remaining <= 5 ? 4 : 0)
-                    .animation(.linear(duration: 1.0), value: remaining)
-
-                Text("\(remaining)")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.secondary)
+            if let counter {
+                counterBadge(counter)
+            } else {
+                timerRing
             }
         }
         .padding(10)
@@ -174,8 +188,79 @@ struct TokenRowView: View {
         }
     }
 
+    private var timerRing: some View {
+        // Красивый таймер
+        ZStack {
+
+            Circle()
+                .stroke(Color.secondary.opacity(0.25), lineWidth: 4)
+                .frame(width: 26, height: 26)
+
+            Circle()
+                .trim(from: 0, to: CGFloat(max(0.0, Double(remaining) / Double(period))))
+                .rotation(.degrees(-90))
+                .stroke(
+                    timerColor,
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .frame(width: 26, height: 26)
+                .scaleEffect(pulse && remaining <= 5 ? 1.12 : 1.0)
+                .shadow(color: timerColor.opacity(remaining <= 5 ? 0.8 : 0),
+                        radius: remaining <= 5 ? 4 : 0)
+                .animation(.linear(duration: 1.0), value: remaining)
+
+            Text("\(remaining)")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func counterBadge(_ value: UInt64) -> some View {
+        let badge = VStack(spacing: 1) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10, weight: .bold))
+            Text("#\(value)")
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .foregroundColor(hoveringCounter ? .primary : .secondary)
+        .frame(width: 34, height: 34)
+        .background(
+            Circle().fill(hoveringCounter ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
+        )
+        .overlay(
+            Circle().strokeBorder(hoveringCounter ? Color.accentColor.opacity(0.8) : Color.clear, lineWidth: 1)
+        )
+        .animation(.easeInOut(duration: 0.15), value: hoveringCounter)
+
+        if isLocked {
+            badge
+        } else {
+            badge
+                .contentShape(Circle())
+                .onHover { hoveringCounter = $0 }
+                .onTapGesture(perform: onAdvance)
+                .accessibilityAddTraits(.isButton)
+                .help("Show the next code (counter \(value))")
+        }
+    }
+
+    private var lockedCode: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 12, weight: .semibold))
+            Text(Self.grouped(String(repeating: "•", count: digits)))
+                .font(.system(size: 20, weight: .medium, design: .monospaced))
+        }
+        .foregroundColor(targetsCurrentCode ? .primary : .secondary)
+        .help("Use Touch ID to show and copy the code")
+        .transition(.opacity)
+    }
+
     private func startPulse() {
-        guard remaining <= 5 else {
+        guard counter == nil, remaining <= 5 else {
             pulse = false
             return
         }
@@ -189,13 +274,17 @@ struct TokenRowView: View {
     }
 
     private func copyCurrent() {
+        if isLocked {
+            onUnlock()
+            return
+        }
         guard let code else { return }
         CodeClipboard.copy(code, playSound: playsSound)
+        copiedCode = code
         onCopy()
-        copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.copiedFeedbackDuration) {
             withAnimation {
-                copied = false
+                if copiedCode == code { copiedCode = nil }
             }
         }
     }
@@ -204,6 +293,25 @@ struct TokenRowView: View {
         guard code.count >= 6, code.count % 2 == 0 else { return code }
         let middle = code.index(code.startIndex, offsetBy: code.count / 2)
         return String(code[..<middle]) + " " + String(code[middle...])
+    }
+}
+
+private struct KindTag: View {
+    let text: String
+    let tint: Color
+    let hint: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .tracking(0.4)
+            .foregroundColor(tint)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(Capsule().fill(tint.opacity(0.16)))
+            .overlay(Capsule().strokeBorder(tint.opacity(0.4), lineWidth: 0.5))
+            .fixedSize()
+            .help(hint)
     }
 }
 

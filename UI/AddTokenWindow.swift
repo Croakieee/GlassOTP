@@ -5,7 +5,7 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
     static let shared = AddTokenWindowController()
 
     private var hosting: NSHostingController<AddTokenSheet>?
-    private static func contentSize(for mode: AddMode) -> NSSize {
+    static func contentSize(for mode: AddMode) -> NSSize {
         switch mode {
         case .otpauth: return NSSize(width: 560, height: 420)
         case .manual: return NSSize(width: 560, height: 340)
@@ -32,6 +32,9 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
         }
 
         let host = NSHostingController(rootView: makeSheet(onAddMany: onAddMany))
+        if #available(macOS 13.0, *) {
+            host.sizingOptions = []
+        }
         self.hosting = host
 
         let initialSize = Self.contentSize(for: .otpauth)

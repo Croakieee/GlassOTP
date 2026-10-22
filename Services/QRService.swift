@@ -17,7 +17,7 @@ enum QRImportError: Error, LocalizedError {
 }
 
 struct QRService {
-    static func scanOtpauth(from image: NSImage) throws -> String {
+    static func scanAllOtpauth(from image: NSImage) throws -> [String] {
         guard let cg = image.cgImage() else { throw QRImportError.cannotReadImage }
 
         let request = VNDetectBarcodesRequest()
@@ -30,19 +30,16 @@ struct QRService {
             throw QRImportError.noQRFound
         }
 
+        var links: [String] = []
         for r in results {
             if let payload = r.payloadStringValue?.trimmingCharacters(in: .whitespacesAndNewlines) {
                 let lower = payload.lowercased()
-                if lower.hasPrefix("otpauth://") || lower.hasPrefix("otpauth-migration://") {
-                    return payload
+                if (lower.hasPrefix("otpauth://") || lower.hasPrefix("otpauth-migration://")) && !links.contains(payload) {
+                    links.append(payload)
                 }
             }
         }
-        throw QRImportError.noOtpauthInQR
-    }
-
-    static func scanOtpauth(from url: URL) throws -> String {
-        guard let img = NSImage(contentsOf: url) else { throw QRImportError.cannotReadImage }
-        return try scanOtpauth(from: img)
+        guard !links.isEmpty else { throw QRImportError.noOtpauthInQR }
+        return links
     }
 }

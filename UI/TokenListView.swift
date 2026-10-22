@@ -14,7 +14,8 @@ struct TokenListView: View {
     @Binding var autoCloseOnCopy: Bool
     let playsCopySound: Bool
     let selectedID: UUID?
-    let keyboardCopiedID: UUID?
+    let keyboardCopy: CopiedCode?
+    let revealedIDs: Set<UUID>
 
     @State private var contentFrame: CGRect = .zero
 
@@ -25,6 +26,9 @@ struct TokenListView: View {
     let onEditSecret: (UUID) -> Void
     let onDelete: (UUID) -> Void
     let onShowQR: (UUID) -> Void
+    let onToggleProtection: (UUID) -> Void
+    let onRecoveryCodes: (UUID) -> Void
+    let onUnlockCopy: (OTPToken) -> Void
 
     var body: some View {
         let items = store.filteredTokens()
@@ -50,17 +54,24 @@ struct TokenListView: View {
                 LazyVStack(spacing: 10) {
                     ForEach(items) { token in
                         let remaining = store.remaining(for: token)
+                        let isLocked = token.isProtected && !revealedIDs.contains(token.id)
                         TokenRowView(
                             title: token.displayTitle,
-                            code: store.code(for: token),
-                            nextCode: remaining <= TokenRowView.nextCodeThreshold ? store.nextCode(for: token) : nil,
+                            code: isLocked ? nil : store.code(for: token),
+                            nextCode: !isLocked && remaining <= TokenRowView.nextCodeThreshold ? store.nextCode(for: token) : nil,
                             digits: token.digits,
                             remaining: remaining,
                             period: token.period,
                             playsSound: playsCopySound,
                             isSelected: token.id == selectedID,
-                            copiedExternally: token.id == keyboardCopiedID
+                            externallyCopiedCode: keyboardCopy?.id == token.id ? keyboardCopy?.code : nil,
+                            isLocked: isLocked,
+                            kind: token.kind,
+                            counter: token.kind == .hotp ? token.counter : nil,
+                            onAdvance: { store.advanceCounter(token.id) },
+                            onUnlock: { onUnlockCopy(token) }
                         ) {
+                            store.recordUse(token.id)
                             if autoCloseOnCopy {
                                 NotificationCenter.default.post(name: .autoClosePopover, object: nil)
                             }
@@ -80,6 +91,14 @@ struct TokenListView: View {
 
                             Button("Show / edit secret…") {
                                 onEditSecret(token.id)
+                            }
+
+                            Button("Recovery Codes…") {
+                                onRecoveryCodes(token.id)
+                            }
+
+                            Button(token.isProtected ? "Remove Touch ID Protection" : "Protect with Touch ID") {
+                                onToggleProtection(token.id)
                             }
 
                             Divider()

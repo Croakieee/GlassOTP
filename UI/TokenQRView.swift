@@ -61,7 +61,15 @@ struct TokenQRView: View {
 
         let issuerQuery = token.issuer.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         // algorithm must be included — otherwise a re-scanned SHA256/SHA512 token is read back as SHA1.
-        let url = "otpauth://totp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&period=\(token.period)&digits=\(token.digits)"
+        let url: String
+        switch token.kind {
+        case .steam:
+            url = "otpauth://steam/\(label)?secret=\(secret)&issuer=\(issuerQuery)"
+        case .hotp:
+            url = "otpauth://hotp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&counter=\(token.counter)&digits=\(token.digits)"
+        case .totp:
+            url = "otpauth://totp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&period=\(token.period)&digits=\(token.digits)"
+        }
 
         filter.setValue(Data(url.utf8), forKey: "inputMessage")
 

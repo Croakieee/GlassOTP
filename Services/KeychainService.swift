@@ -44,6 +44,7 @@ struct KeychainService {
     private static let vaultAccount = "GlassOTP.vault.v1"
     /// Legacy per-token account prefix (pre-consolidation). Used only for one-time migration.
     private static let legacyPrefix = "token."
+    private static let recoveryPrefix = "recovery."
     private static let damagedVaultAccount = "GlassOTP.vault.v1.damaged"
 
     /// In-memory vault: `uuidString` -> secret. `nil` means "not loaded from keychain yet".
@@ -62,12 +63,35 @@ struct KeychainService {
 
     // MARK: - Public API (signatures unchanged)
 
-    static func setSecret(_ secret: Data, for id: UUID) throws {
+    static func setSecret(_ secret: Data, for id: UUID, recoveryCodes: Data? = nil) throws {
         lock.lock()
         defer { lock.unlock() }
         try loadVaultLocked()
         vault?[id.uuidString] = secret
+        if let recoveryCodes {
+            vault?[recoveryKey(for: id)] = recoveryCodes
+        }
         try persistVaultLocked()
+    }
+
+    static func setRecoveryCodes(_ data: Data?, for id: UUID) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadVaultLocked()
+        guard vault?[recoveryKey(for: id)] != data else { return }
+        vault?[recoveryKey(for: id)] = data
+        try persistVaultLocked()
+    }
+
+    static func recoveryCodes(for id: UUID) throws -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        try loadVaultLocked()
+        return vault?[recoveryKey(for: id)]
+    }
+
+    private static func recoveryKey(for id: UUID) -> String {
+        "\(recoveryPrefix)\(id.uuidString)"
     }
 
     static func getSecret(for id: UUID) throws -> Data {
@@ -84,7 +108,9 @@ struct KeychainService {
         lock.lock()
         defer { lock.unlock() }
         try loadVaultLocked()
-        if vault?.removeValue(forKey: id.uuidString) != nil {
+        let removedSecret = vault?.removeValue(forKey: id.uuidString)
+        let removedCodes = vault?.removeValue(forKey: recoveryKey(for: id))
+        if removedSecret != nil || removedCodes != nil {
             try persistVaultLocked()
         }
     }
@@ -93,7 +119,7 @@ struct KeychainService {
         lock.lock()
         defer { lock.unlock() }
         try loadVaultLocked()
-        return Set((vault ?? [:]).keys)
+        return Set((vault ?? [:]).keys.filter { !$0.hasPrefix(recoveryPrefix) })
     }
 
     static func removeAll() throws {
