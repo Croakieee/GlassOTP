@@ -104,7 +104,15 @@ Click any row to copy its current code. A countdown ring shows how long the code
 
 ### Next code
 
-In the last **5 seconds** of a period, the next code appears next to the current one. Click it to copy it right away instead of waiting for the countdown — most services also accept the neighbouring code. When the period rolls over, the next code slides into place.
+In the last **5 seconds** of a period, the next code appears next to the current one in a **NEXT** badge, with a short glint so you notice it. Click the badge to copy the next code right away instead of waiting for the countdown — most services also accept the neighbouring code.
+
+It is always clear which code you will copy:
+
+- Pointer over the row — the row is highlighted and the **current** code is copied.
+- Pointer over **NEXT** — the badge lights up, the current code dims and the **next** code is copied.
+- After copying, the row shows **Copied** or the badge shows **Copied next**.
+
+When the period rolls over, the next code slides into place.
 
 <p align="center">
   <img src="screenshots/next-code.png" width="452" alt="Next code next to the current one">

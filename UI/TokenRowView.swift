@@ -16,7 +16,7 @@ enum CodeClipboard {
 
 struct TokenRowView: View {
     static let nextCodeThreshold = 5
-    private static let copiedFeedbackDuration: TimeInterval = 2.0
+    static let copiedFeedbackDuration: TimeInterval = 2.0
     private static let codeChangeAnimation = Animation.spring(response: 0.35, dampingFraction: 0.8)
 
     let title: String
@@ -31,7 +31,7 @@ struct TokenRowView: View {
     let onCopy: () -> Void
 
     @State private var copied = false
-    @State private var copiedNext = false
+    @State private var hoveringRow = false
     @State private var hoveringNext = false
     @State private var pulse = false
 
@@ -44,6 +44,28 @@ struct TokenRowView: View {
 
     private var showsCopied: Bool {
         copied || copiedExternally
+    }
+
+    private var targetsCurrentCode: Bool {
+        hoveringRow && !hoveringNext && code != nil
+    }
+
+    private var currentCodeOpacity: Double {
+        if showsCopied { return 0.35 }
+        if hoveringNext { return 0.45 }
+        return 1.0
+    }
+
+    private var rowFillOpacity: Double {
+        if isSelected { return 0.12 }
+        if targetsCurrentCode { return 0.10 }
+        return 0.06
+    }
+
+    private var rowStrokeColor: Color {
+        if isSelected { return Color.accentColor.opacity(0.8) }
+        if targetsCurrentCode { return Color.white.opacity(0.16) }
+        return Color.clear
     }
 
     var body: some View {
@@ -63,7 +85,7 @@ struct TokenRowView: View {
                         Text(Self.grouped(code ?? String(repeating: "-", count: digits)))
                             .font(.system(size: 20, weight: .medium, design: .monospaced))
                             .foregroundColor(code == nil ? .secondary : .primary)
-                            .opacity(showsCopied ? 0.35 : 1.0)
+                            .opacity(currentCodeOpacity)
                             .id(code)
                             .transition(.asymmetric(
                                 insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -78,11 +100,22 @@ struct TokenRowView: View {
                             .font(.system(size: 12, weight: .semibold))
                             .transition(.opacity.combined(with: .scale))
                     } else if let nextCode {
-                        nextCodeChip(nextCode)
+                        NextCodeChip(
+                            code: nextCode,
+                            playsSound: playsSound,
+                            hovering: $hoveringNext,
+                            onCopy: onCopy
+                        )
+                        .id(nextCode)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .leading).combined(with: .opacity),
+                            removal: .opacity
+                        ))
                     }
                 }
                 .animation(Self.codeChangeAnimation, value: code)
                 .animation(Self.codeChangeAnimation, value: nextCode)
+                .animation(.easeInOut(duration: 0.15), value: hoveringNext)
             }
 
             Spacer()
@@ -115,17 +148,19 @@ struct TokenRowView: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(isSelected ? 0.12 : 0.06))
+                .fill(Color.white.opacity(rowFillOpacity))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(isSelected ? 0.8 : 0), lineWidth: 1.5)
+                .stroke(rowStrokeColor, lineWidth: isSelected ? 1.5 : 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onHover { hoveringRow = $0 }
         .onTapGesture(perform: copyCurrent)
         .accessibilityAddTraits(.isButton)
         .animation(.easeInOut(duration: 0.2), value: showsCopied)
         .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .animation(.easeInOut(duration: 0.15), value: targetsCurrentCode)
 
         // Пульсация только в последние секунды
         .onAppear {
@@ -134,32 +169,9 @@ struct TokenRowView: View {
         .onChange(of: remaining) { _ in
             startPulse()
         }
-    }
-
-    private func nextCodeChip(_ next: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: copiedNext ? "checkmark" : "arrow.right")
-                .font(.system(size: 9, weight: .bold))
-            Text(copiedNext ? "Copied" : Self.grouped(next))
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+        .onChange(of: nextCode) { next in
+            if next == nil { hoveringNext = false }
         }
-        .foregroundColor(copiedNext ? .green : (hoveringNext ? .primary : .secondary))
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(
-            Capsule().fill(Color.white.opacity(hoveringNext ? 0.16 : 0.08))
-        )
-        .contentShape(Capsule())
-        .onHover { hoveringNext = $0 }
-        .onTapGesture { copyNext(next) }
-        .accessibilityAddTraits(.isButton)
-        .help("Next code — copy it to use right away")
-        .animation(.easeInOut(duration: 0.15), value: hoveringNext)
-        .animation(.easeInOut(duration: 0.2), value: copiedNext)
-        .transition(.asymmetric(
-            insertion: .move(edge: .leading).combined(with: .opacity),
-            removal: .opacity
-        ))
     }
 
     private func startPulse() {
@@ -180,27 +192,88 @@ struct TokenRowView: View {
         guard let code else { return }
         CodeClipboard.copy(code, playSound: playsSound)
         onCopy()
-        flash($copied)
-    }
-
-    private func copyNext(_ next: String) {
-        CodeClipboard.copy(next, playSound: playsSound)
-        onCopy()
-        flash($copiedNext)
-    }
-
-    private func flash(_ flag: Binding<Bool>) {
-        flag.wrappedValue = true
+        copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.copiedFeedbackDuration) {
             withAnimation {
-                flag.wrappedValue = false
+                copied = false
             }
         }
     }
 
-    private static func grouped(_ code: String) -> String {
+    static func grouped(_ code: String) -> String {
         guard code.count >= 6, code.count % 2 == 0 else { return code }
         let middle = code.index(code.startIndex, offsetBy: code.count / 2)
         return String(code[..<middle]) + " " + String(code[middle...])
+    }
+}
+
+private struct NextCodeChip: View {
+    let code: String
+    let playsSound: Bool
+    @Binding var hovering: Bool
+    let onCopy: () -> Void
+
+    @State private var copied = false
+    @State private var glintPhase: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: copied ? "checkmark" : "arrow.right")
+                .font(.system(size: 9, weight: .bold))
+            Text(copied ? "Copied next" : "Next")
+                .font(.system(size: 9, weight: .bold))
+                .textCase(.uppercase)
+            if !copied {
+                Text(TokenRowView.grouped(code))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+            }
+        }
+        .foregroundColor(copied ? .green : (hovering ? .primary : .secondary))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(hovering ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
+        )
+        .overlay(
+            Capsule().strokeBorder(hovering ? Color.accentColor.opacity(0.8) : Color.clear, lineWidth: 1)
+        )
+        .overlay(glint)
+        .contentShape(Capsule())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: copy)
+        .accessibilityAddTraits(.isButton)
+        .help("Copy the next code")
+        .animation(.easeInOut(duration: 0.15), value: hovering)
+        .animation(.easeInOut(duration: 0.2), value: copied)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9).delay(0.35)) {
+                glintPhase = 1
+            }
+        }
+    }
+
+    private var glint: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                colors: [Color.white.opacity(0), Color.white.opacity(0.65), Color.white.opacity(0)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: geometry.size.width * 0.45)
+            .offset(x: -geometry.size.width * 0.45 + glintPhase * geometry.size.width * 1.45)
+        }
+        .clipShape(Capsule())
+        .allowsHitTesting(false)
+    }
+
+    private func copy() {
+        CodeClipboard.copy(code, playSound: playsSound)
+        onCopy()
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + TokenRowView.copiedFeedbackDuration) {
+            withAnimation {
+                copied = false
+            }
+        }
     }
 }

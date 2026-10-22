@@ -91,6 +91,8 @@ final class StatusBarController: NSObject {
         hotKeyCancellable = appState.$globalHotKeyEnabled.sink { [weak self] enabled in
             self?.setHotKey(enabled: enabled)
         }
+
+        store.timer.pause()
     }
 
     deinit {
