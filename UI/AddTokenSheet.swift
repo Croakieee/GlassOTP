@@ -63,7 +63,9 @@ struct AddTokenSheet: View {
             footer
         }
         .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(width: AddTokenWindowController.contentSize(for: mode).width,
+               height: AddTokenWindowController.contentSize(for: mode).height,
+               alignment: .top)
         .onChange(of: mode) { onModeChange($0) }
         .sheet(isPresented: $showCameraScanner) {
             CameraSheetView(
@@ -467,9 +469,10 @@ struct AddTokenSheet: View {
         let pb = NSPasteboard.general
         let fileURLs = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
 
-        if let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           text.lowercased().hasPrefix("otpauth") {
-            otpauthText = text
+        let links = pb.string(forType: .string).map(LinkListImport.links) ?? []
+
+        if !links.isEmpty {
+            otpauthText = links.joined(separator: "\n")
         } else if let url = fileURLs?.first {
             importImage(at: url)
         } else if let image = NSImage(pasteboard: pb) {
@@ -495,22 +498,18 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let link = try QRService.scanOtpauth(from: url)
-                DispatchQueue.main.async { self.otpauthText = link }
-            } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                DispatchQueue.main.async { self.errorMessage = message }
-            }
+        guard let image = NSImage(contentsOf: url) else {
+            errorMessage = QRImportError.cannotReadImage.errorDescription
+            return
         }
+        importImage(img: image)
     }
 
     private func importImage(img: NSImage) {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let link = try QRService.scanOtpauth(from: img)
-                DispatchQueue.main.async { self.otpauthText = link }
+                let links = try QRService.scanAllOtpauth(from: img)
+                DispatchQueue.main.async { self.otpauthText = links.joined(separator: "\n") }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 DispatchQueue.main.async { self.errorMessage = message }

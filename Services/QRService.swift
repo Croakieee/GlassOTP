@@ -17,10 +17,6 @@ enum QRImportError: Error, LocalizedError {
 }
 
 struct QRService {
-    static func scanOtpauth(from image: NSImage) throws -> String {
-        try scanAllOtpauth(from: image)[0]
-    }
-
     static func scanAllOtpauth(from image: NSImage) throws -> [String] {
         guard let cg = image.cgImage() else { throw QRImportError.cannotReadImage }
 
@@ -45,10 +41,5 @@ struct QRService {
         }
         guard !links.isEmpty else { throw QRImportError.noOtpauthInQR }
         return links
-    }
-
-    static func scanOtpauth(from url: URL) throws -> String {
-        guard let img = NSImage(contentsOf: url) else { throw QRImportError.cannotReadImage }
-        return try scanOtpauth(from: img)
     }
 }

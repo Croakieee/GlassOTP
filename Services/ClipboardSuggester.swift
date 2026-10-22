@@ -27,8 +27,8 @@ enum ClipboardReader {
         let fromText = (text.map(LinkListImport.links) ?? []).flatMap { link in
             (try? ImportExportService.parseOtpauthOrMigration(link).tokens) ?? []
         }
-        guard fromText.isEmpty, let image, let link = try? QRService.scanOtpauth(from: image) else { return fromText }
-        return (try? ImportExportService.parseOtpauthOrMigration(link).tokens) ?? []
+        guard fromText.isEmpty, let image, let links = try? QRService.scanAllOtpauth(from: image) else { return fromText }
+        return links.flatMap { (try? ImportExportService.parseOtpauthOrMigration($0).tokens) ?? [] }
     }
 
     static func title(_ accounts: [ImportedToken]) -> String {

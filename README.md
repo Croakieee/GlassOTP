@@ -312,6 +312,8 @@ From the right-click menu:
 - **Export** — authenticate, choose a location, set a password and save an encrypted `.glassotp` file with all tokens, including their recovery codes, protection and HOTP counters. Tokens in Recently Deleted are not included. GlassOTP warns you if the password is shorter than 8 characters.
 - **Import** — select a `.glassotp` file and enter its password. New tokens are added, existing ones are skipped. Backups made by earlier versions import as before.
 
+> A backup that contains HOTP or Steam accounts needs GlassOTP 1.3 or later to import correctly.
+
 > The backup file contains all your secrets. Choose a strong password and keep the file somewhere safe.
 
 ## Security
