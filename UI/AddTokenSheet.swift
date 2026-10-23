@@ -41,6 +41,9 @@ struct AddTokenSheet: View {
 
     @State private var screenHint: ScreenScanError?
     @State private var scanningScreen = false
+    @State private var messageGeneration = 0
+
+    private static let messageLifetime: TimeInterval = 15
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -162,12 +165,34 @@ struct AddTokenSheet: View {
         }
     }
 
+    private func showError(_ message: String?) {
+        errorMessage = message
+        hideMessagesLater()
+    }
+
+    private func showHint(_ hint: ScreenScanError) {
+        screenHint = hint
+        hideMessagesLater()
+    }
+
+    private func hideMessagesLater() {
+        messageGeneration += 1
+        let generation = messageGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.messageLifetime) {
+            guard messageGeneration == generation else { return }
+            withAnimation {
+                errorMessage = nil
+                screenHint = nil
+            }
+        }
+    }
+
     private func scanScreen(selectingArea: Bool) {
         errorMessage = nil
         screenHint = nil
         guard ScreenQRScanner.hasPermission else {
             ScreenQRScanner.requestPermission()
-            screenHint = .permissionNeeded
+            showHint(.permissionNeeded)
             return
         }
         scanningScreen = true
@@ -177,9 +202,9 @@ struct AddTokenSheet: View {
             case .success(let links):
                 otpauthText = links.joined(separator: "\n")
             case .failure(.nothingFound) where !selectingArea:
-                screenHint = .nothingFound
+                showHint(.nothingFound)
             case .failure(let error):
-                errorMessage = error.errorDescription
+                showError(error.errorDescription)
             }
         }
     }
@@ -394,7 +419,7 @@ struct AddTokenSheet: View {
             }
             showResult(onAddMany(list), unsupported: unsupported)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
     }
 
@@ -408,11 +433,11 @@ struct AddTokenSheet: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation { addedMessage = nil } }
             clearAllFields()
         } else if result.failed > 0 {
-            errorMessage = "Couldn't save to the Keychain. Check the warning in the GlassOTP menu-bar window."
+            showError("Couldn't save to the Keychain. Check the warning in the GlassOTP menu-bar window.")
         } else {
-            errorMessage = result.duplicates <= 1
+            showError(result.duplicates <= 1
                 ? "This token already exists."
-                : "All \(result.duplicates) tokens already exist."
+                : "All \(result.duplicates) tokens already exist.")
         }
     }
 
@@ -478,7 +503,7 @@ struct AddTokenSheet: View {
         } else if let image = NSImage(pasteboard: pb) {
             importImage(img: image)
         } else {
-            errorMessage = "The clipboard has no QR image or otpauth link."
+            showError("The clipboard has no QR image or otpauth link.")
         }
     }
 
@@ -493,13 +518,13 @@ struct AddTokenSheet: View {
             guard !SteamImport.looksEncrypted(data) else { throw SteamImportError.encryptedNeedsFolder }
             showResult(onAddMany([try SteamImport.token(fromMaFile: data)]), unsupported: 0)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
     }
 
     private func importImage(at url: URL) {
         guard let image = NSImage(contentsOf: url) else {
-            errorMessage = QRImportError.cannotReadImage.errorDescription
+            showError(QRImportError.cannotReadImage.errorDescription)
             return
         }
         importImage(img: image)
@@ -512,7 +537,7 @@ struct AddTokenSheet: View {
                 DispatchQueue.main.async { self.otpauthText = links.joined(separator: "\n") }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                DispatchQueue.main.async { self.errorMessage = message }
+                DispatchQueue.main.async { self.showError(message) }
             }
         }
     }
@@ -525,11 +550,11 @@ struct AddTokenSheet: View {
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted { self.showCameraScanner = true }
-                    else { self.errorMessage = "Camera access is denied." }
+                    else { self.showError("Camera access is denied.") }
                 }
             }
         default:
-            errorMessage = "Camera access is denied. Allow it in System Settings → Security & Privacy."
+            showError("Camera access is denied. Allow it in System Settings → Security & Privacy.")
         }
     }
 
