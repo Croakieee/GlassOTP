@@ -171,7 +171,7 @@ Press **+** in the top-right corner of the list to open the **Add Token** window
 ### Link / QR
 
 - **Drop** an image or PDF with a QR code onto the window, or click **Image…** (PDFs are searched page by page)
-- **Paste** takes whatever is on the clipboard: an `otpauth://` link, a copied image or an image file copied in Finder.
+- **Paste** takes whatever is on the clipboard: `otpauth://` links (anywhere in the copied text), a copied image, or an image or PDF file copied in Finder.
 - **Screen** reads QR codes from your screen — for example the one a website shows when you turn on two-factor login. Choose **Whole Screen** to find codes anywhere on your displays, or **Select Area…** to pick the QR code with the crosshair (Esc cancels). If a whole-screen scan finds nothing, GlassOTP offers **Select Area…** right away.
 - **Camera** works with any camera: the built-in one, an iPhone (Continuity Camera, macOS 14+) or a virtual camera such as OBS.
 - Or type a link into the **Link** field — `otpauth://totp/…`, `otpauth://hotp/…`, `otpauth://steam/…` or a Google Authenticator export (`otpauth-migration://…`, many tokens at once). You can paste many links at once, one per line.
@@ -202,7 +202,7 @@ Press **Add**. The window stays open, so you can add several tokens in a row; **
 
 You don't have to open the Add window at all:
 
-- **Press ⌥⌘O twice quickly** — the crosshair appears; select the QR code (Esc cancels) and the account is added. Turn this off with **Double ⌥⌘O to scan a QR code** in [settings](#menu-bar-menu--settings).
+- **Press ⌥⌘O twice quickly** — the crosshair appears; select the QR code (Esc cancels) and the account is added. It needs the same Screen Recording permission as **Screen**. Turn it off with **Double ⌥⌘O to scan a QR code** in [settings](#menu-bar-menu--settings).
 - **Services menu** — select an `otpauth://` link in any app, or right-click an image or a file in Finder, and choose **Services → Add to GlassOTP**. For files, macOS may ask you to enable it once in System Settings → Keyboard → Keyboard Shortcuts → Services. GlassOTP must be in your Applications folder and opened once.
 - **Drop onto the menu bar icon** — a QR image, a PDF, an `otpauth://` link, a `.maFile` or any export GlassOTP can [import](#from-another-authenticator-app). Files with a password ask for it first.
 
@@ -220,7 +220,7 @@ On macOS 26 and later, macOS asks before an app reads the clipboard by itself. T
 
 ### From another authenticator app
 
-Export your accounts in the other app, then right-click the key icon → **Import** and choose the file. GlassOTP recognises the format by itself and asks for a password only if the export has one.
+Export your accounts in the other app, then right-click the key icon → **Import** and choose the file — or simply drop the file onto the key icon. GlassOTP recognises the format by itself and asks for a password only if the export has one.
 
 | App | Export file | Password-protected export |
 | --- | --- | --- |
@@ -360,6 +360,7 @@ From the right-click menu:
 | **Notifications are off** | Click **?** next to the message to open System Settings and allow notifications for GlassOTP. Until then, export / import / delete confirmations won't appear as notifications; import errors are still shown as a dialog. |
 
 - **Screen scanning keeps asking for permission** — after allowing GlassOTP under Screen Recording, quit GlassOTP (right-click the key icon → **Exit**) and open it again; macOS applies the permission only to a fresh start.
+- **Add to GlassOTP is missing from the Services menu** — make sure GlassOTP is in your Applications folder and has been opened once, then enable it in System Settings → Keyboard → Keyboard Shortcuts → Services. If it still doesn't appear, log out and back in — macOS refreshes the Services list only then.
 - **⌥⌘O does nothing** — another app may already use this shortcut. Turn off **Global shortcut ⌥⌘O** in settings and use the menu bar icon instead.
 
 ## Notes & limitations
@@ -370,7 +371,7 @@ From the right-click menu:
 
 ## Building from source
 
-Requirements: **Xcode 14+**, **Swift 5.7+**.
+Requirements: **Xcode 16.3 or later** (macOS 15.4 SDK or newer). The app itself runs on macOS 11.7 and later.
 
 ```sh
 git clone https://github.com/Croakieee/GlassOTP.git
