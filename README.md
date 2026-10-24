@@ -169,12 +169,12 @@ Press **+** in the top-right corner of the list to open the **Add Token** window
 
 - **Drop** an image with a QR code onto the window, or click **Image…**
 - **Paste** takes whatever is on the clipboard: an `otpauth://` link, a copied image or an image file copied in Finder.
-- **Scan Screen** finds QR codes anywhere on your displays — for example the one a website shows when you turn on two-factor login. If nothing is found, **Select Area…** lets you pick the QR code with the crosshair (Esc cancels).
+- **Screen** reads QR codes from your screen — for example the one a website shows when you turn on two-factor login. Choose **Whole Screen** to find codes anywhere on your displays, or **Select Area…** to pick the QR code with the crosshair (Esc cancels). If a whole-screen scan finds nothing, GlassOTP offers **Select Area…** right away.
 - **Camera** works with any camera: the built-in one, an iPhone (Continuity Camera, macOS 14+) or a virtual camera such as OBS.
 - Or type a link into the **Link** field — `otpauth://totp/…`, `otpauth://hotp/…`, `otpauth://steam/…` or a Google Authenticator export (`otpauth-migration://…`, many tokens at once). You can paste many links at once, one per line.
 - **Drop** a Steam Desktop Authenticator `.maFile` onto the window to add that Steam account.
 
-**Scan Screen** needs the *Screen Recording* permission once: allow GlassOTP in System Settings → Privacy & Security → Screen Recording (the **Open Settings** button takes you there), then quit and reopen GlassOTP. Prefer not to grant it? Take a screenshot of the QR code to the clipboard with **⌃⇧⌘4** and press **Paste** — or simply open GlassOTP and use the [clipboard suggestion](#from-the-clipboard).
+Reading the screen needs the *Screen Recording* permission once: allow GlassOTP in System Settings → Privacy & Security → Screen Recording (the **Open Settings** button takes you there), then quit and reopen GlassOTP. Prefer not to grant it? Take a screenshot of the QR code to the clipboard with **⌃⇧⌘4** and press **Paste** — or simply open GlassOTP and use the [clipboard suggestion](#from-the-clipboard).
 
 <p align="center">
   <img src="screenshots/add-link.png" width="420" alt="Add token — Link / QR">
@@ -328,7 +328,7 @@ From the right-click menu:
 - If macOS can't verify you (for example, the Mac has no login password), GlassOTP keeps everything locked instead of letting you through.
 - Copied codes are marked as sensitive, so well-behaved clipboard managers don't store them.
 - The clipboard is checked only when you open the list and only if it changed; an added `otpauth://` link is removed from it.
-- **Scan Screen** screenshots never leave your Mac: they are read for QR codes and deleted right away. On macOS 15 and later, macOS periodically asks you to confirm GlassOTP's Screen Recording access.
+- Screen scans never leave your Mac: they are read for QR codes and deleted right away. On macOS 15 and later, macOS periodically asks you to confirm GlassOTP's Screen Recording access.
 
 <p align="center">
   <img src="screenshots/locked.png" width="400" alt="Locked token list">
@@ -343,7 +343,7 @@ From the right-click menu:
 | **Some saved tokens couldn't be read** | Restore the missing tokens from a backup with **Import**. |
 | **Notifications are off** | Click **?** next to the message to open System Settings and allow notifications for GlassOTP. Until then, export / import / delete confirmations won't appear as notifications; import errors are still shown as a dialog. |
 
-- **Scan Screen keeps asking for permission** — after allowing GlassOTP under Screen Recording, quit GlassOTP (right-click the key icon → **Exit**) and open it again; macOS applies the permission only to a fresh start.
+- **Screen scanning keeps asking for permission** — after allowing GlassOTP under Screen Recording, quit GlassOTP (right-click the key icon → **Exit**) and open it again; macOS applies the permission only to a fresh start.
 - **⌥⌘O does nothing** — another app may already use this shortcut. Turn off **Global shortcut ⌥⌘O** in settings and use the menu bar icon instead.
 
 ## Notes & limitations

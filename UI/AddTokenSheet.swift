@@ -117,8 +117,15 @@ struct AddTokenSheet: View {
             HStack(spacing: 8) {
                 sourceButton("Image…", systemImage: "photo", action: importFromImageFile)
                 sourceButton("Paste", systemImage: "doc.on.clipboard", action: importFromClipboard)
-                sourceButton("Scan Screen", systemImage: "display", action: { scanScreen(selectingArea: false) })
-                    .disabled(scanningScreen)
+                Menu {
+                    Button("Whole Screen") { scanScreen(selectingArea: false) }
+                    Button("Select Area…") { scanScreen(selectingArea: true) }
+                } label: {
+                    Label("Screen", systemImage: "display")
+                }
+                .frame(maxWidth: .infinity)
+                .disabled(scanningScreen)
+                .help("Find a QR code on the whole screen, or select the area with the QR code")
                 sourceButton("Camera", systemImage: "camera", action: startCameraScanner)
             }
 
