@@ -27,16 +27,22 @@ enum FileImportService {
     static let aegisPrompt = "Enter the Aegis vault password"
     static let authenticatorProPrompt = "Enter the Authenticator Pro backup password"
 
-    private static let maxFileSize = 10 * 1024 * 1024
+    static let maxFileSize = 10 * 1024 * 1024
+
+    static func readLimited(_ url: URL) throws -> Data {
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard size <= maxFileSize else { throw FileImportError.tooLarge }
+        let data = try Data(contentsOf: url)
+        guard data.count <= maxFileSize else { throw FileImportError.tooLarge }
+        return data
+    }
 
     static func plan(for url: URL) throws -> FileImportPlan {
         if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
             return try folderPlan(url)
         }
 
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        guard size <= maxFileSize else { throw FileImportError.tooLarge }
-        let data = try Data(contentsOf: url)
+        let data = try readLimited(url)
 
         if (try? JSONDecoder().decode(BackupContainer.self, from: data)) != nil {
             return FileImportPlan(passwordPrompt: backupPrompt) { password in

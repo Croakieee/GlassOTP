@@ -312,7 +312,7 @@ From the right-click menu:
 - **Export** — authenticate, choose a location, set a password and save an encrypted `.glassotp` file with all tokens, including their recovery codes, protection and HOTP counters. Tokens in Recently Deleted are not included. GlassOTP warns you if the password is shorter than 8 characters.
 - **Import** — select a `.glassotp` file and enter its password. New tokens are added, existing ones are skipped. Backups made by earlier versions import as before.
 
-> A backup that contains HOTP or Steam accounts needs GlassOTP 1.3 or later to import correctly.
+> A backup that contains HOTP or Steam accounts needs GlassOTP 1.3 or later to import correctly. Backups made by newer versions use a stronger key (Argon2id) and can't be opened by GlassOTP 1.3 or earlier — older backups still import as before.
 
 > The backup file contains all your secrets. Choose a strong password and keep the file somewhere safe.
 
@@ -324,7 +324,8 @@ From the right-click menu:
 - **Require Touch ID to view** hides all codes until you authenticate, every time the list opens.
 - **Protected tokens** stay hidden behind Touch ID even when the list itself is open.
 - **Recovery codes** are kept in the Keychain next to the secrets, never in plain text on disk.
-- Backups are encrypted with **AES-GCM** using a key derived from your password (**PBKDF2-HMAC-SHA256**). Without the password, a backup can't be read.
+- Backups are encrypted with **AES-GCM** using a key derived from your password with **Argon2id** (64 MB of memory per attempt, which makes guessing the password slow). Backups from earlier versions used PBKDF2-HMAC-SHA256 and still import. Without the password, a backup can't be read.
+- If macOS can't verify you (for example, the Mac has no login password), GlassOTP keeps everything locked instead of letting you through.
 - Copied codes are marked as sensitive, so well-behaved clipboard managers don't store them.
 - The clipboard is checked only when you open the list and only if it changed; an added `otpauth://` link is removed from it.
 - **Scan Screen** screenshots never leave your Mac: they are read for QR codes and deleted right away. On macOS 15 and later, macOS periodically asks you to confirm GlassOTP's Screen Recording access.

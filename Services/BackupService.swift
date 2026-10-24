@@ -13,6 +13,7 @@ enum BackupError: Error, LocalizedError {
     case corruptedPayload
     case badPassword
     case keyDerivationFailed
+    case unsupportedVersion
 
     var errorDescription: String? {
         switch self {
@@ -20,13 +21,19 @@ enum BackupError: Error, LocalizedError {
         case .corruptedPayload:    return "Backup file is corrupted."
         case .badPassword:         return "Invalid password encoding."
         case .keyDerivationFailed: return "Key derivation failed."
+        case .unsupportedVersion:  return "This backup was made by a newer version of GlassOTP. Update GlassOTP, then import it again."
         }
     }
 }
 
 struct BackupService {
 
-    private static let currentVersion = 2
+    private static let currentVersion = 3
+    private static let supportedVersions: Set<Int> = [1, 2, 3]
+    private static let argonIterations = 3
+    private static let argonMemoryKiB = 64 * 1024
+    private static let argonParallelism = 4
+    private static let keyLength = 32
 
     // MARK: - Export
 
@@ -48,6 +55,8 @@ struct BackupService {
 
     static func `import`(data: Data, password: String) throws -> [ImportedToken] {
         let container = try JSONDecoder().decode(BackupContainer.self, from: data)
+        guard supportedVersions.contains(container.version) else { throw BackupError.unsupportedVersion }
+        guard !container.salt.isEmpty, !container.sealedData.isEmpty else { throw BackupError.corruptedPayload }
         let key       = try deriveKey(password: password, salt: container.salt, version: container.version)
 
         let sealedBox = try AES.GCM.SealedBox(combined: container.sealedData)
@@ -72,9 +81,23 @@ struct BackupService {
             let data     = password.data(using: .utf8)!
             let hash     = SHA256.hash(data: data + salt)
             return SymmetricKey(data: Data(hash))
-        default:
+        case 2:
             // v2+: PBKDF2-HMAC-SHA256, 100 000 iterations.
             return try pbkdf2(password: password, salt: salt)
+        case 3:
+            return try argon2(password: password, salt: salt)
+        default:
+            throw BackupError.unsupportedVersion
+        }
+    }
+
+    private static func argon2(password: String, salt: Data) throws -> SymmetricKey {
+        do {
+            let key = try Argon2id.derive(password: Array(password.utf8), salt: Array(salt), iterations: argonIterations,
+                                          memoryKiB: argonMemoryKiB, parallelism: argonParallelism, length: keyLength)
+            return SymmetricKey(data: Data(key))
+        } catch {
+            throw BackupError.keyDerivationFailed
         }
     }
 

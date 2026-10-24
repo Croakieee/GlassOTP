@@ -514,7 +514,7 @@ struct AddTokenSheet: View {
         }
         errorMessage = nil
         do {
-            let data = try Data(contentsOf: url)
+            let data = try FileImportService.readLimited(url)
             guard !SteamImport.looksEncrypted(data) else { throw SteamImportError.encryptedNeedsFolder }
             showResult(onAddMany([try SteamImport.token(fromMaFile: data)]), unsupported: 0)
         } catch {

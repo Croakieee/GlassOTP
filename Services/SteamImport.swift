@@ -88,7 +88,7 @@ enum SteamImport {
     }
 
     static func manifest(in folder: URL) -> Manifest? {
-        guard let data = try? Data(contentsOf: folder.appendingPathComponent(manifestName)) else { return nil }
+        guard let data = try? FileImportService.readLimited(folder.appendingPathComponent(manifestName)) else { return nil }
         return try? JSONDecoder().decode(Manifest.self, from: data)
     }
 
@@ -102,7 +102,7 @@ enum SteamImport {
         if let manifest, manifest.isEncrypted {
             guard let passkey else { throw SteamImportError.wrongPasskey }
             let parsed = collect(entries.map { entry in {
-                let text = try String(contentsOf: file(entry, in: folder), encoding: .utf8)
+                let text = String(decoding: try FileImportService.readLimited(file(entry, in: folder)), as: UTF8.self)
                 let plain = try decrypt(text, passkey: passkey, salt: entry.encryptionSalt ?? "", iv: entry.encryptionIV ?? "")
                 return try token(fromMaFile: plain)
             } })
@@ -110,7 +110,7 @@ enum SteamImport {
             return parsed
         }
         let files = manifest == nil ? maFiles(in: folder) : entries.map { file($0, in: folder) }
-        let parsed = collect(files.map { url in { try token(fromMaFile: Data(contentsOf: url)) } })
+        let parsed = collect(files.map { url in { try token(fromMaFile: FileImportService.readLimited(url)) } })
         guard !parsed.tokens.isEmpty else { throw SteamImportError.noAccounts }
         return parsed
     }
