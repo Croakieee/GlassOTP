@@ -340,7 +340,7 @@ From the right-click menu:
 | **No access to the Keychain** | You declined the Keychain password prompt. Click **Retry** and allow access. |
 | **Secret storage is damaged** | Use **Delete All** in the right-click menu, then **Import** a backup. The damaged data is kept aside in the Keychain, not destroyed. |
 | **Some saved tokens couldn't be read** | Restore the missing tokens from a backup with **Import**. |
-| **Notifications are off** | Export / import / delete confirmations won't appear as notifications. Import errors are still shown as a dialog. |
+| **Notifications are off** | Click **?** next to the message to open System Settings and allow notifications for GlassOTP. Until then, export / import / delete confirmations won't appear as notifications; import errors are still shown as a dialog. |
 
 - **Scan Screen keeps asking for permission** — after allowing GlassOTP under Screen Recording, quit GlassOTP (right-click the key icon → **Exit**) and open it again; macOS applies the permission only to a fresh start.
 - **⌥⌘O does nothing** — another app may already use this shortcut. Turn off **Global shortcut ⌥⌘O** in settings and use the menu bar icon instead.

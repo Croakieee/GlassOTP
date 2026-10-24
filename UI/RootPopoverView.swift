@@ -322,11 +322,21 @@ struct RootPopoverView: View {
             )
         }
         if notificationsDenied {
-            warningLine(
-                icon: "bell.slash",
-                text: "Notifications are off — some confirmations won’t appear.",
-                color: .secondary
-            )
+            HStack(spacing: 0) {
+                warningLine(
+                    icon: "bell.slash",
+                    text: "Notifications are off — some confirmations won’t appear.",
+                    color: .secondary
+                )
+                Button(action: openNotificationSettings) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .foregroundColor(.accentColor)
+                .help("Open System Settings to allow notifications for GlassOTP")
+                .padding(.trailing, 6)
+            }
         }
     }
 
@@ -346,6 +356,12 @@ struct RootPopoverView: View {
         NotificationCenter.default.post(name: .lockAuthBegan, object: nil)
         store.retryKeychainAccess()
         NotificationCenter.default.post(name: .lockAuthEnded, object: nil)
+    }
+
+    private func openNotificationSettings() {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications?id=\(id)") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     private func refreshNotificationStatus() {
