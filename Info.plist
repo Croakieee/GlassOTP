@@ -4,6 +4,41 @@
 <dict>
 	<key>NSCameraUseContinuityCameraDeviceType</key>
 	<true/>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Add to GlassOTP</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>addToGlassOTP</string>
+			<key>NSPortName</key>
+			<string>GlassOTP</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.utf8-plain-text</string>
+				<string>public.plain-text</string>
+				<string>public.url</string>
+				<string>public.tiff</string>
+				<string>public.png</string>
+				<string>public.file-url</string>
+			</array>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.image</string>
+				<string>com.adobe.pdf</string>
+				<string>public.plain-text</string>
+				<string>public.json</string>
+				<string>public.comma-separated-values-text</string>
+				<string>com.glassotp.backup</string>
+				<string>public.data</string>
+			</array>
+		</dict>
+	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

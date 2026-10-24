@@ -59,19 +59,22 @@ enum ImportCrypto {
         return output.prefix(moved)
     }
 
-    static func aesGCMDecrypt(_ cipher: Data, key: Data, nonce: Data, tag: Data) throws -> Data {
+    static func aesGCMDecrypt(_ cipher: Data, key: Data, nonce: Data, tag: Data, authenticating aad: Data? = nil) throws -> Data {
         do {
             let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonce), ciphertext: cipher, tag: tag)
+            if let aad {
+                return try AES.GCM.open(box, using: SymmetricKey(data: key), authenticating: aad)
+            }
             return try AES.GCM.open(box, using: SymmetricKey(data: key))
         } catch {
             throw ImportCryptoError.decryption
         }
     }
 
-    static func aesGCMDecrypt(combinedWithTag data: Data, key: Data, nonce: Data) throws -> Data {
+    static func aesGCMDecrypt(combinedWithTag data: Data, key: Data, nonce: Data, authenticating aad: Data? = nil) throws -> Data {
         let tagLength = 16
         guard data.count >= tagLength else { throw ImportCryptoError.decryption }
-        return try aesGCMDecrypt(data.dropLast(tagLength), key: key, nonce: nonce, tag: data.suffix(tagLength))
+        return try aesGCMDecrypt(data.dropLast(tagLength), key: key, nonce: nonce, tag: data.suffix(tagLength), authenticating: aad)
     }
 
     static func hmacSHA256(key: Data, message: Data) -> Data {

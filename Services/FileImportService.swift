@@ -12,7 +12,7 @@ enum FileImportError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupported:
-            return "GlassOTP can't read this file. Supported: GlassOTP backups, 2FAS, Aegis, Authenticator Pro, Bitwarden (.json or .csv), Steam Desktop Authenticator and text files with otpauth:// links."
+            return "GlassOTP can't read this file. Supported: GlassOTP backups, 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth (plain text), Bitwarden (.json or .csv), Steam Desktop Authenticator, images and PDFs with QR codes, and text files with otpauth:// links."
         case .tooLarge:
             return "This file is too large to be an authenticator export."
         }
@@ -26,6 +26,7 @@ enum FileImportService {
     static let twoFASPrompt = "Enter the 2FAS backup password"
     static let aegisPrompt = "Enter the Aegis vault password"
     static let authenticatorProPrompt = "Enter the Authenticator Pro backup password"
+    static let protonPrompt = "Enter the Proton Authenticator export password"
 
     static let maxFileSize = 10 * 1024 * 1024
 
@@ -92,6 +93,14 @@ enum FileImportService {
         }
         if BitwardenImport.matches(json) {
             return FileImportPlan(passwordPrompt: nil) { _ in try BitwardenImport.read(json) }
+        }
+        if ProtonImport.matches(json) {
+            return FileImportPlan(passwordPrompt: ProtonImport.isEncrypted(json) ? protonPrompt : nil) { password in
+                try ProtonImport.read(json, password: password)
+            }
+        }
+        if json["kdfParams"] != nil && json["encryptedData"] != nil {
+            return FileImportPlan(passwordPrompt: nil) { _ in throw ExternalImportError.enteEncrypted }
         }
         return nil
     }

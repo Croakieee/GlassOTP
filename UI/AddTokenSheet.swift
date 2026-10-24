@@ -232,7 +232,7 @@ struct AddTokenSheet: View {
                 .foregroundColor(isDropping ? .accentColor : .secondary)
             Text("Drop a QR code image here")
                 .font(.system(size: 13, weight: .semibold))
-            Text("PNG, JPEG, HEIC, a screenshot or a Steam .maFile")
+            Text("PNG, JPEG, HEIC, PDF, a screenshot or a Steam .maFile")
                 .font(.footnote)
                 .foregroundColor(.secondary)
         }
@@ -489,7 +489,7 @@ struct AddTokenSheet: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.allowedFileTypes = ["png","jpg","jpeg","heic","tiff","bmp","gif"]
+        panel.allowedFileTypes = ["png","jpg","jpeg","heic","tiff","bmp","gif","pdf"]
         panel.begin { resp in
             guard resp == .OK, let url = panel.url else { return }
             self.importImage(at: url)
@@ -530,6 +530,18 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
+        guard url.pathExtension.lowercased() != QuickAdd.pdfExtension else {
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let links = try QRService.scanAllOtpauth(fromPDF: url)
+                    DispatchQueue.main.async { self.otpauthText = links.joined(separator: "\n") }
+                } catch {
+                    let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    DispatchQueue.main.async { self.showError(message) }
+                }
+            }
+            return
+        }
         guard let image = NSImage(contentsOf: url) else {
             showError(QRImportError.cannotReadImage.errorDescription)
             return

@@ -10,6 +10,7 @@ extension Notification.Name {
     static let lockAuthEnded = Notification.Name("lockAuthEnded")
     static let popoverKeyCommand = Notification.Name("popoverKeyCommand")
     static let keyboardCopyDone = Notification.Name("keyboardCopyDone")
+    static let quickAddFeedback = Notification.Name("quickAddFeedback")
 }
 
 enum PopoverUserInfo {

@@ -39,15 +39,16 @@
 - Click a row to copy its code; codes are grouped (`123 456`) for easy reading
 - **Next code** appears in the last seconds of a period — copy it without waiting
 - **Keyboard-first**: type to search, **↑/↓** to select, **Enter** to copy and jump back to your app
+- **Press ⌥⌘O twice** to select a QR code anywhere on screen and add the account in one go
 - **Frequently used first** — the accounts you copy most move to the top
 
 **Flexible import**
 
 - Time-based (**TOTP**), counter-based (**HOTP**) and **Steam Guard** codes
-- **Move from another app** — 2FAS, Aegis, Authenticator Pro, Bitwarden and Steam Desktop Authenticator exports, password-protected ones too
+- **Move from another app** — 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth, Bitwarden and Steam Desktop Authenticator exports, password-protected ones too
 - Text files or pasted blocks with many `otpauth://` links at once
 - `otpauth://totp/…`, `otpauth://hotp/…`, `otpauth://steam/…` links and **Google Authenticator** exports (`otpauth-migration://…`)
-- QR codes from an image file, drag & drop, the clipboard, the **camera** or **anywhere on your screen**
+- QR codes from an image or PDF, drag & drop, the clipboard, the **camera** or **anywhere on your screen**
 - Manual entry — TOTP, HOTP or Steam, SHA1 / SHA256 / SHA512, 6 or 8 digits, any period or counter
 
 **Private & secure**
@@ -65,6 +66,7 @@
 - Pin, rename and search tokens
 - **Recently Deleted** — a deleted token can be restored for 30 days, or undone right away
 - **Clipboard suggestions** — copy an `otpauth://` link or a QR screenshot, open GlassOTP and add it with one click
+- **Add from anywhere** — *Add to GlassOTP* in the Services menu, or drop a QR image, PDF, link or export file onto the menu bar icon
 - Close after copy, copy sound, launch at login — all optional
 
 ## Installation
@@ -151,6 +153,7 @@ Steam accounts carry a blue **STEAM** label and show Steam's own 5-character cod
 | Key | Action |
 | --- | --- |
 | **⌥⌘O** | Open or close GlassOTP from any app |
+| **⌥⌘O ⌥⌘O** (twice, quickly) | Select a QR code anywhere on screen and add the account — see [From anywhere](#from-anywhere) |
 | *type* | Search — the first match is selected |
 | **↑ / ↓** | Move the selection |
 | **Enter** | Copy the selected code, close the window and return to the app you came from — ready for **⌘V** |
@@ -167,7 +170,7 @@ Press **+** in the top-right corner of the list to open the **Add Token** window
 
 ### Link / QR
 
-- **Drop** an image with a QR code onto the window, or click **Image…**
+- **Drop** an image or PDF with a QR code onto the window, or click **Image…** (PDFs are searched page by page)
 - **Paste** takes whatever is on the clipboard: an `otpauth://` link, a copied image or an image file copied in Finder.
 - **Screen** reads QR codes from your screen — for example the one a website shows when you turn on two-factor login. Choose **Whole Screen** to find codes anywhere on your displays, or **Select Area…** to pick the QR code with the crosshair (Esc cancels). If a whole-screen scan finds nothing, GlassOTP offers **Select Area…** right away.
 - **Camera** works with any camera: the built-in one, an iPhone (Continuity Camera, macOS 14+) or a virtual camera such as OBS.
@@ -195,6 +198,16 @@ Press **Add**. The window stays open, so you can add several tokens in a row; **
 - Entries GlassOTP can't generate codes for (MD5 in a Google Authenticator export) are skipped and counted in the result message.
 - A token needs a name: an issuer, an account, or both.
 
+### From anywhere
+
+You don't have to open the Add window at all:
+
+- **Press ⌥⌘O twice quickly** — the crosshair appears; select the QR code (Esc cancels) and the account is added. Turn this off with **Double ⌥⌘O to scan a QR code** in [settings](#menu-bar-menu--settings).
+- **Services menu** — select an `otpauth://` link in any app, or right-click an image or a file in Finder, and choose **Services → Add to GlassOTP**. For files, macOS may ask you to enable it once in System Settings → Keyboard → Keyboard Shortcuts → Services. GlassOTP must be in your Applications folder and opened once.
+- **Drop onto the menu bar icon** — a QR image, a PDF, an `otpauth://` link, a `.maFile` or any export GlassOTP can [import](#from-another-authenticator-app). Files with a password ask for it first.
+
+Each time, GlassOTP opens and shows a line with the result — for example *Added “GitHub · me”* or *Already in GlassOTP*.
+
 ### From the clipboard
 
 Copy an `otpauth://` link (or a screenshot of a QR code) and open GlassOTP: a line at the top offers the new account — click **Add**. GlassOTP then removes the link from the clipboard, since it contains the secret. **×** hides the offer until the clipboard changes; accounts you already have are never offered.
@@ -214,6 +227,8 @@ Export your accounts in the other app, then right-click the key icon → **Impor
 | **2FAS** | `.2fas` backup | Supported |
 | **Aegis** | `.json` vault export | Supported |
 | **Authenticator Pro** | `.authpro` backup or a URI list (`.txt`) | Supported |
+| **Proton Authenticator** | `.json` export | Supported |
+| **Ente Auth** | Plain-text export (`.txt`) | Not supported — export as plain text |
 | **Bitwarden** | `.json` or `.csv` vault export | Not supported — export without a password |
 | **Any app** | A text file with `otpauth://` links, one per line | — |
 | **Steam Desktop Authenticator** | See [below](#from-steam-desktop-authenticator) | Supported |
@@ -297,6 +312,7 @@ The **settings menu** (slider icon in the list):
 - **HOTP: new code after each copy** — shown when you have HOTP tokens, see [Counter-based (HOTP) codes](#counter-based-hotp-codes)
 - **Suggest accounts from clipboard** — offer accounts from a copied link or QR screenshot, see [From the clipboard](#from-the-clipboard)
 - **Global shortcut ⌥⌘O**
+- **Double ⌥⌘O to scan a QR code** — press the shortcut twice to scan a QR code anywhere on screen, see [From anywhere](#from-anywhere)
 - **Require Touch ID to view** — lock the list until you authenticate
 - **Recently Deleted…** — [restore or erase deleted tokens](#recently-deleted)
 
