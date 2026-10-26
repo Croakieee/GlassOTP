@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct RecoveryCodesView: View {
     @ObservedObject var store: OTPStore
@@ -12,12 +13,17 @@ struct RecoveryCodesView: View {
     @State private var pasted: String = ""
     @State private var copiedID: UUID?
     @State private var pendingDeletion: RecoveryCode?
+    @State private var scanning = false
+    @State private var isDropping = false
 
     private static let copiedFeedbackDuration: TimeInterval = 1.5
     private static let allCodesID = UUID()
     private static let rowHeight: CGFloat = 34
     private static let rowSpacing: CGFloat = 6
     private static let maxListHeight: CGFloat = 160
+    private static let imageTypes = ["png", "jpg", "jpeg", "heic", "tiff", "bmp", "gif", "pdf"]
+    private static let dropTypes = ["public.file-url", "public.tiff", "public.png", "public.jpeg"]
+    private static let permissionText = "Allow Screen Recording for GlassOTP in System Settings → Privacy & Security, then reopen GlassOTP."
 
     private var unusedCodes: [RecoveryCode] { codes.filter { !$0.isUsed } }
 
@@ -71,7 +77,7 @@ struct RecoveryCodesView: View {
     private var codeList: some View {
         VStack(alignment: .leading, spacing: 6) {
             if codes.isEmpty {
-                Text("No recovery codes yet. Paste them below.")
+                Text("No codes yet. Paste or scan them below.")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
             } else {
@@ -171,6 +177,11 @@ struct RecoveryCodesView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.black.opacity(0.12))
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.accentColor, lineWidth: isDropping ? 1.5 : 0)
+            )
+            .onDrop(of: Self.dropTypes, isTargeted: $isDropping, perform: handleDrop)
 
             HStack {
                 if let statusText {
@@ -179,6 +190,15 @@ struct RecoveryCodesView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+                Menu {
+                    Button("Select Area…", action: scanArea)
+                    Button("Image File…", action: chooseImage)
+                } label: {
+                    Text(scanning ? "Scanning…" : "Scan")
+                }
+                .fixedSize()
+                .disabled(scanning)
+                .help("Read codes from part of the screen or from an image")
                 Button("Add codes", action: addPasted)
                     .disabled(pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -218,6 +238,97 @@ struct RecoveryCodesView: View {
         statusText = merge.skipped > 0
             ? "Added \(merge.added), skipped \(merge.skipped)."
             : "Added \(merge.added)."
+    }
+
+    private func scanArea() {
+        errorText = nil
+        guard ScreenQRScanner.hasPermission else {
+            ScreenQRScanner.requestPermission()
+            errorText = Self.permissionText
+            return
+        }
+        scanning = true
+        keepPopoverOpen(true)
+        ScreenQRScanner.capture(selectingArea: true, hidingWindows: false, read: { images in
+            .success(images.flatMap { TextRecognizer.lines(in: $0) })
+        }, completion: { result in
+            keepPopoverOpen(false)
+            scanning = false
+            switch result {
+            case .success(let lines):
+                insertRecognized(lines)
+            case .failure(.cancelled):
+                break
+            case .failure(let error):
+                errorText = error.errorDescription
+            }
+        })
+    }
+
+    private func chooseImage() {
+        errorText = nil
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedFileTypes = Self.imageTypes
+        panel.level = .popUpMenu
+        keepPopoverOpen(true)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { response in
+            keepPopoverOpen(false)
+            guard response == .OK, let url = panel.url else { return }
+            recognize { try TextRecognizer.lines(inFile: url) }
+        }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard let item = providers.first else { return false }
+        if item.hasItemConformingToTypeIdentifier("public.file-url") {
+            item.loadItem(forTypeIdentifier: "public.file-url", options: nil) { data, _ in
+                let url = (data as? Data).flatMap { URL(dataRepresentation: $0, relativeTo: nil) } ?? data as? URL
+                guard let url else { return }
+                DispatchQueue.main.async { recognize { try TextRecognizer.lines(inFile: url) } }
+            }
+            return true
+        }
+        guard let type = Self.dropTypes.dropFirst().first(where: item.hasItemConformingToTypeIdentifier) else { return false }
+        item.loadDataRepresentation(forTypeIdentifier: type) { data, _ in
+            guard let data, let image = NSImage(data: data) else { return }
+            DispatchQueue.main.async { recognize { try TextRecognizer.lines(in: image) } }
+        }
+        return true
+    }
+
+    private func recognize(_ read: @escaping () throws -> [String]) {
+        errorText = nil
+        scanning = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result(catching: read)
+            DispatchQueue.main.async {
+                scanning = false
+                switch result {
+                case .success(let lines):
+                    insertRecognized(lines)
+                case .failure(let error):
+                    errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func insertRecognized(_ lines: [String]) {
+        let found = RecoveryCode.recognized(in: lines)
+        guard !found.isEmpty else {
+            statusText = "No codes found."
+            return
+        }
+        let current = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
+        pasted = ((current.isEmpty ? [] : [current]) + found).joined(separator: "\n")
+        statusText = "Found \(found.count), check them."
+    }
+
+    private func keepPopoverOpen(_ keep: Bool) {
+        NotificationCenter.default.post(name: keep ? .lockAuthBegan : .lockAuthEnded, object: nil)
     }
 
     private func toggleUsed(_ code: RecoveryCode) {

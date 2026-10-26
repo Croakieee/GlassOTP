@@ -33,6 +33,9 @@ extension RecoveryCode {
     private static let separators = try! NSRegularExpression(pattern: "[\\n\\r,;\\t]+| {2,}")
     private static let listMarker = try! NSRegularExpression(pattern: "^(?:\\d{1,3}[.)]|[-•*])\\s+")
     private static let innerSpaces = try! NSRegularExpression(pattern: "\\s+")
+    private static let codeWord = try! NSRegularExpression(pattern: "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
+    private static let minRecognizedLength = 6
+    private static let maxRecognizedWords = 4
 
     static func candidates(in text: String) -> [String] {
         let marked = replacing(separators, in: text, with: "\n")
@@ -45,6 +48,26 @@ extension RecoveryCode {
                     .trimmingCharacters(in: .whitespaces)
             }
             .filter { !$0.isEmpty }
+    }
+
+    static func recognized(in lines: [String]) -> [String] {
+        var found: [String] = []
+        for candidate in lines.flatMap(candidates(in:)) where looksLikeCode(candidate) && !found.contains(candidate) {
+            found.append(candidate)
+        }
+        return found
+    }
+
+    private static func looksLikeCode(_ candidate: String) -> Bool {
+        let words = candidate.components(separatedBy: " ")
+        let alphanumerics = candidate.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+        guard words.count <= maxRecognizedWords,
+              alphanumerics.count >= minRecognizedLength,
+              candidate.count <= maxLength else { return false }
+        return words.allSatisfy { word in
+            let range = NSRange(word.startIndex..., in: word)
+            return codeWord.firstMatch(in: word, range: range) != nil && word.contains(where: \.isNumber)
+        }
     }
 
     static func merging(_ text: String, into existing: [RecoveryCode]) -> RecoveryCodeMerge {

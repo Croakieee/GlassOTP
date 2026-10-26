@@ -245,6 +245,9 @@ struct RootPopoverView: View {
                 Toggle("Double ⌥⌘O to scan a QR code", isOn: $appState.doubleHotKeyScans)
                     .disabled(!appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
+                if #available(macOS 13, *) {
+                    Toggle("Allow Shortcuts to read codes", isOn: $appState.shortcutsReadCodes)
+                }
                 Divider()
                 Button(store.trash.isEmpty ? "Recently Deleted" : "Recently Deleted (\(store.trash.count))…") {
                     showTrash = true

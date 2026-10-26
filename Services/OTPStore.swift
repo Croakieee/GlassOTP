@@ -89,6 +89,10 @@ final class OTPStore: ObservableObject {
         code(for: token, at: timer.now)
     }
 
+    func liveCode(for token: OTPToken) -> String? {
+        code(for: token, at: Date())
+    }
+
     func nextCode(for token: OTPToken) -> String? {
         guard token.kind.isTimeBased else { return nil }
         return code(for: token, at: timer.now.addingTimeInterval(TimeInterval(token.period)))
