@@ -2,6 +2,11 @@ import SwiftUI
 import AppKit
 import AVFoundation
 
+struct AddPrefill: Equatable {
+    let id = UUID()
+    let link: String
+}
+
 enum AddMode: String, CaseIterable {
     case otpauth = "Link / QR"
     case manual  = "Manually"
@@ -9,6 +14,7 @@ enum AddMode: String, CaseIterable {
 
 struct AddTokenSheet: View {
     let onAddMany: ([ImportedToken]) -> ImportResult
+    var prefill: AddPrefill? = nil
     let onClose: () -> Void
     var onModeChange: (AddMode) -> Void = { _ in }
 
@@ -70,6 +76,8 @@ struct AddTokenSheet: View {
                height: AddTokenWindowController.contentSize(for: mode).height,
                alignment: .top)
         .onChange(of: mode) { onModeChange($0) }
+        .onAppear { apply(prefill) }
+        .onChange(of: prefill) { apply($0) }
         .sheet(isPresented: $showCameraScanner) {
             CameraSheetView(
                 selectedCameraID: $selectedCameraID,
@@ -446,6 +454,15 @@ struct AddTokenSheet: View {
                 ? "This token already exists."
                 : "All \(result.duplicates) tokens already exist.")
         }
+    }
+
+    private func apply(_ prefill: AddPrefill?) {
+        guard let prefill else { return }
+        mode = .otpauth
+        otpauthText = prefill.link
+        errorMessage = nil
+        addedMessage = nil
+        screenHint = nil
     }
 
     private func clearAllFields() {

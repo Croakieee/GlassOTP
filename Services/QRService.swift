@@ -26,11 +26,9 @@ struct QRService {
     }
 
     static func scanAllOtpauth(fromPDF url: URL) throws -> [String] {
-        guard let document = CGPDFDocument(url as CFURL), document.numberOfPages > 0 else { throw QRImportError.cannotReadImage }
         var links: [String] = []
         var sawQR = false
-        for index in 1...min(document.numberOfPages, maxPDFPages) {
-            guard let page = document.page(at: index), let image = render(page) else { continue }
+        try renderPages(ofPDF: url) { image in
             do {
                 for link in try scanAllOtpauth(from: image) where !links.contains(link) {
                     links.append(link)
@@ -39,11 +37,19 @@ struct QRService {
             } catch QRImportError.noOtpauthInQR {
                 sawQR = true
             } catch {
-                continue
+                return
             }
         }
         guard !links.isEmpty else { throw sawQR ? QRImportError.noOtpauthInQR : QRImportError.noQRFound }
         return links
+    }
+
+    static func renderPages(ofPDF url: URL, _ body: (CGImage) -> Void) throws {
+        guard let document = CGPDFDocument(url as CFURL), document.numberOfPages > 0 else { throw QRImportError.cannotReadImage }
+        for index in 1...min(document.numberOfPages, maxPDFPages) {
+            guard let page = document.page(at: index), let image = render(page) else { continue }
+            body(image)
+        }
     }
 
     private static func render(_ page: CGPDFPage) -> CGImage? {
@@ -62,7 +68,7 @@ struct QRService {
         return context.makeImage()
     }
 
-    private static func scanAllOtpauth(from cg: CGImage) throws -> [String] {
+    static func scanAllOtpauth(from cg: CGImage) throws -> [String] {
         let request = VNDetectBarcodesRequest()
         request.symbologies = [.QR]
 

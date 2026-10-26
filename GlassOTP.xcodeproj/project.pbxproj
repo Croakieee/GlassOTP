@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00BD57635A0E4DFBAA25B3F5 /* QuickAddBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE1D2B9569F46A2A9F20D26 /* QuickAddBanner.swift */; };
 		013E72B4207843A0A24A92C1 /* RecoveryCodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89400EDA8AF1405189CB5C40 /* RecoveryCodesView.swift */; };
 		03F336ECDA3447D194ACB708 /* ImportCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE320D9A16E141DC91201AAF /* ImportCrypto.swift */; };
 		045EF6AA94194A7995F8FA9F /* LinkListImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F55047F951F41E1B580C5F4 /* LinkListImport.swift */; };
@@ -17,16 +18,16 @@
 		4E9A414D2F689583005B465B /* EditSecretView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E9A414C2F689582005B465B /* EditSecretView.swift */; };
 		4E9A414F2F689D23005B465B /* TokenQRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E9A414E2F689D22005B465B /* TokenQRView.swift */; };
 		4EEB523F2F79D77A000FB861 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEB523E2F79D774000FB861 /* BackupService.swift */; };
-		FCBA6EA725E44C8BA22E3D02 /* QuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EF7C7D06BCE48BC80DD7CD7 /* QuickAdd.swift */; };
 		4EEE4D4E2FABCF8F008869E7 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EEE4D4D2FABCF89008869E7 /* NotificationService.swift */; };
 		63DB038E8A024CCFAF646C19 /* AuthenticatorProImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E370E8C2F48A48F7DE235 /* AuthenticatorProImport.swift */; };
 		77805116A68043A3AE486B5E /* RecoveryCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90EF72D68D7C482585DF6FD5 /* RecoveryCode.swift */; };
-		9FD1CA23911B42AAA4D3B0C3 /* BitwardenImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F6490F265345B79E6458E4 /* BitwardenImport.swift */; };
 		7FAA91B00CA5424FBC50686E /* ProtonImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEE1B32D51C4D6D8CADDCFD /* ProtonImport.swift */; };
+		859647DE4AE443BB850E1572 /* GlassOTPShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5EA0B9DFB344F3FA578B64A /* GlassOTPShortcuts.swift */; };
+		9FD1CA23911B42AAA4D3B0C3 /* BitwardenImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F6490F265345B79E6458E4 /* BitwardenImport.swift */; };
 		B1A020D790A14DC2A17FB3BA /* AegisImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6ED320FCE694FE4AB2D51BB /* AegisImport.swift */; };
 		B3F1C935FD0746E187C9008A /* DeviceAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 863889046E674D46B72F8CD0 /* DeviceAuth.swift */; };
+		B859BCFE989946279A522DE5 /* TextRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3C022CB8494F3CAA19A6C5 /* TextRecognizer.swift */; };
 		B8991B45140A4123B6D17E1A /* RecentlyDeletedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B50DAAB87742A4829AEBAF /* RecentlyDeletedView.swift */; };
-		00BD57635A0E4DFBAA25B3F5 /* QuickAddBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE1D2B9569F46A2A9F20D26 /* QuickAddBanner.swift */; };
 		BECD5794DF6441BEA40381ED /* ClipboardSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B671D3B781C45B1B2FA44C2 /* ClipboardSuggester.swift */; };
 		C95F5F6D952A4FD2A333E0DC /* ScreenQRScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73DBF910C194027B0673AC9 /* ScreenQRScanner.swift */; };
 		CD9D904A352340559BDB6D36 /* GlobalHotKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */; };
@@ -36,7 +37,6 @@
 		CEA2FCC92E97035E00FA6D87 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CEA2FCC82E97035E00FA6D87 /* Preview Assets.xcassets */; };
 		CEA2FCD22E9703AD00FA6D87 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */; };
 		CEA2FCD42E9703C000FA6D87 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */; };
-		FBE86C1DC1F6462B895A248A /* StatusBarController+Drop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3915CBFC71614FE1A6D6194F /* StatusBarController+Drop.swift */; };
 		CEA2FCD62E9703DC00FA6D87 /* SceneCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD52E9703DC00FA6D87 /* SceneCoordinator.swift */; };
 		CEA2FCD92E97040100FA6D87 /* VisualEffectBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCD82E97040100FA6D87 /* VisualEffectBackground.swift */; };
 		CEA2FCDB2E97042000FA6D87 /* RootPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2FCDA2E97042000FA6D87 /* RootPopoverView.swift */; };
@@ -64,30 +64,33 @@
 		E3C3C14921014B3098913887 /* ClipboardBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7B5D34ED8241F2A34B6EED /* ClipboardBanner.swift */; };
 		EB3FA0AB3931402894D470A3 /* Scrypt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95979A735CB945DAAC4CD2D5 /* Scrypt.swift */; };
 		F5A1920243B2497AB7DDB378 /* SteamImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB68CF70DF542F98CB85F49 /* SteamImport.swift */; };
+		FBE86C1DC1F6462B895A248A /* StatusBarController+Drop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3915CBFC71614FE1A6D6194F /* StatusBarController+Drop.swift */; };
+		FCBA6EA725E44C8BA22E3D02 /* QuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EF7C7D06BCE48BC80DD7CD7 /* QuickAdd.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotKey.swift; sourceTree = "<group>"; };
+		0EF7C7D06BCE48BC80DD7CD7 /* QuickAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAdd.swift; sourceTree = "<group>"; };
 		14E78727415845B3A4B5DA55 /* FileImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportService.swift; sourceTree = "<group>"; };
 		1F55047F951F41E1B580C5F4 /* LinkListImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkListImport.swift; sourceTree = "<group>"; };
 		25D839BEF6654FB1BB4E3455 /* Argon2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Argon2.swift; sourceTree = "<group>"; };
+		3915CBFC71614FE1A6D6194F /* StatusBarController+Drop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusBarController+Drop.swift"; sourceTree = "<group>"; };
 		4E2560FF2F7DE1A800809F51 /* Notifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifications.swift; sourceTree = "<group>"; };
 		4E9A414C2F689582005B465B /* EditSecretView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSecretView.swift; sourceTree = "<group>"; };
 		4E9A414E2F689D22005B465B /* TokenQRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenQRView.swift; sourceTree = "<group>"; };
 		4EEB523E2F79D774000FB861 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
-		0EF7C7D06BCE48BC80DD7CD7 /* QuickAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuickAdd.swift"; sourceTree = "<group>"; };
 		4EEE4D4D2FABCF89008869E7 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		4EEE4D4F2FABD0DE008869E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4FB68CF70DF542F98CB85F49 /* SteamImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamImport.swift; sourceTree = "<group>"; };
 		6E9FFBA6254E4F3A83A86DFC /* ExternalImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalImport.swift; sourceTree = "<group>"; };
 		73F6490F265345B79E6458E4 /* BitwardenImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BitwardenImport.swift; sourceTree = "<group>"; };
-		DEEE1B32D51C4D6D8CADDCFD /* ProtonImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProtonImport.swift"; sourceTree = "<group>"; };
 		7B671D3B781C45B1B2FA44C2 /* ClipboardSuggester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardSuggester.swift; sourceTree = "<group>"; };
 		863889046E674D46B72F8CD0 /* DeviceAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAuth.swift; sourceTree = "<group>"; };
 		89400EDA8AF1405189CB5C40 /* RecoveryCodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryCodesView.swift; sourceTree = "<group>"; };
 		8B4E370E8C2F48A48F7DE235 /* AuthenticatorProImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticatorProImport.swift; sourceTree = "<group>"; };
 		90EF72D68D7C482585DF6FD5 /* RecoveryCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryCode.swift; sourceTree = "<group>"; };
 		95979A735CB945DAAC4CD2D5 /* Scrypt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scrypt.swift; sourceTree = "<group>"; };
+		BB3C022CB8494F3CAA19A6C5 /* TextRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextRecognizer.swift; sourceTree = "<group>"; };
 		C6ED320FCE694FE4AB2D51BB /* AegisImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AegisImport.swift; sourceTree = "<group>"; };
 		CE0C8F7E2E97B6C60071582A /* QRCameraScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCameraScanner.swift; sourceTree = "<group>"; };
 		CEA2FCBE2E97035A00FA6D87 /* GlassOTP.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassOTP.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -97,7 +100,6 @@
 		CEA2FCCA2E97035E00FA6D87 /* GlassOTP.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GlassOTP.entitlements; sourceTree = "<group>"; };
 		CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
-		3915CBFC71614FE1A6D6194F /* StatusBarController+Drop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusBarController+Drop.swift"; sourceTree = "<group>"; };
 		CEA2FCD52E9703DC00FA6D87 /* SceneCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCoordinator.swift; sourceTree = "<group>"; };
 		CEA2FCD82E97040100FA6D87 /* VisualEffectBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualEffectBackground.swift; sourceTree = "<group>"; };
 		CEA2FCDA2E97042000FA6D87 /* RootPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootPopoverView.swift; sourceTree = "<group>"; };
@@ -121,12 +123,14 @@
 		CEA2FD012E971BA300FA6D87 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		CEA2FD032E9726C000FA6D87 /* AddTokenWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTokenWindow.swift; sourceTree = "<group>"; };
 		CED6B1192E99AA5700A25206 /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
+		D5EA0B9DFB344F3FA578B64A /* GlassOTPShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOTPShortcuts.swift; sourceTree = "<group>"; };
 		D73DBF910C194027B0673AC9 /* ScreenQRScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenQRScanner.swift; sourceTree = "<group>"; };
+		DEEE1B32D51C4D6D8CADDCFD /* ProtonImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtonImport.swift; sourceTree = "<group>"; };
 		E1B50DAAB87742A4829AEBAF /* RecentlyDeletedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyDeletedView.swift; sourceTree = "<group>"; };
-		FEE1D2B9569F46A2A9F20D26 /* QuickAddBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuickAddBanner.swift"; sourceTree = "<group>"; };
 		E9F186E4363F437D8ED6939D /* TwoFASImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwoFASImport.swift; sourceTree = "<group>"; };
 		EE7B5D34ED8241F2A34B6EED /* ClipboardBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardBanner.swift; sourceTree = "<group>"; };
 		FE320D9A16E141DC91201AAF /* ImportCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCrypto.swift; sourceTree = "<group>"; };
+		FEE1D2B9569F46A2A9F20D26 /* QuickAddBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAddBanner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -209,6 +213,7 @@
 			children = (
 				CEA2FCC12E97035A00FA6D87 /* GlassOTPApp.swift */,
 				CEA2FCD12E9703AD00FA6D87 /* AppDelegate.swift */,
+				D5EA0B9DFB344F3FA578B64A /* GlassOTPShortcuts.swift */,
 				086E4C8982F9416F9B7F4972 /* GlobalHotKey.swift */,
 				CEA2FCD32E9703C000FA6D87 /* StatusBarController.swift */,
 				3915CBFC71614FE1A6D6194F /* StatusBarController+Drop.swift */,
@@ -271,6 +276,7 @@
 				4EEB523E2F79D774000FB861 /* BackupService.swift */,
 				0EF7C7D06BCE48BC80DD7CD7 /* QuickAdd.swift */,
 				D73DBF910C194027B0673AC9 /* ScreenQRScanner.swift */,
+				BB3C022CB8494F3CAA19A6C5 /* TextRecognizer.swift */,
 				7B671D3B781C45B1B2FA44C2 /* ClipboardSuggester.swift */,
 				14E78727415845B3A4B5DA55 /* FileImportService.swift */,
 				4FB68CF70DF542F98CB85F49 /* SteamImport.swift */,
@@ -398,6 +404,8 @@
 				4EEB523F2F79D77A000FB861 /* BackupService.swift in Sources */,
 				FCBA6EA725E44C8BA22E3D02 /* QuickAdd.swift in Sources */,
 				C95F5F6D952A4FD2A333E0DC /* ScreenQRScanner.swift in Sources */,
+				B859BCFE989946279A522DE5 /* TextRecognizer.swift in Sources */,
+				859647DE4AE443BB850E1572 /* GlassOTPShortcuts.swift in Sources */,
 				BECD5794DF6441BEA40381ED /* ClipboardSuggester.swift in Sources */,
 				D98A7C49D7084A2883219830 /* FileImportService.swift in Sources */,
 				F5A1920243B2497AB7DDB378 /* SteamImport.swift in Sources */,
@@ -541,7 +549,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -556,7 +564,12 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.7;
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.3.2;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AppIntents,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.GlassOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -574,7 +587,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -588,7 +601,12 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.7;
-				MARKETING_VERSION = 1.3.1;
+				MARKETING_VERSION = 1.3.2;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					AppIntents,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.yourname.GlassOTP;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -20,18 +20,18 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(onAddMany: @escaping ([ImportedToken]) -> ImportResult) {
+    func show(prefill: AddPrefill? = nil, onAddMany: @escaping ([ImportedToken]) -> ImportResult) {
         // .accessory apps can't properly bring windows to front without switching to .regular.
         NSApp.setActivationPolicy(.regular)
 
         if let win = window {
-            hosting?.rootView = makeSheet(onAddMany: onAddMany)
+            hosting?.rootView = makeSheet(prefill: prefill, onAddMany: onAddMany)
             NSApp.activate(ignoringOtherApps: true)
             win.makeKeyAndOrderFront(nil)
             return
         }
 
-        let host = NSHostingController(rootView: makeSheet(onAddMany: onAddMany))
+        let host = NSHostingController(rootView: makeSheet(prefill: prefill, onAddMany: onAddMany))
         if #available(macOS 13.0, *) {
             host.sizingOptions = []
         }
@@ -64,9 +64,10 @@ final class AddTokenWindowController: NSWindowController, NSWindowDelegate {
         win.makeKeyAndOrderFront(nil)
     }
 
-    private func makeSheet(onAddMany: @escaping ([ImportedToken]) -> ImportResult) -> AddTokenSheet {
+    private func makeSheet(prefill: AddPrefill?, onAddMany: @escaping ([ImportedToken]) -> ImportResult) -> AddTokenSheet {
         AddTokenSheet(
             onAddMany: onAddMany,
+            prefill: prefill,
             onClose: { [weak self] in self?.window?.close() },
             onModeChange: { [weak self] mode in self?.resize(for: mode) }
         )

@@ -41,6 +41,7 @@
 - **Keyboard-first**: type to search, **↑/↓** to select, **Enter** to copy and jump back to your app
 - **Press ⌥⌘O twice** to select a QR code anywhere on screen and add the account in one go
 - **Frequently used first** — the accounts you copy most move to the top
+- **Shortcuts and Siri** (macOS 13 and later) — get a code from a shortcut, optional and off by default
 
 **Flexible import**
 
@@ -49,6 +50,7 @@
 - Text files or pasted blocks with many `otpauth://` links at once
 - `otpauth://totp/…`, `otpauth://hotp/…`, `otpauth://steam/…` links and **Google Authenticator** exports (`otpauth-migration://…`)
 - QR codes from an image or PDF, drag & drop, the clipboard, the **camera** or **anywhere on your screen**
+- Click an `otpauth://` link in a browser or email — the Add window opens with it
 - Manual entry — TOTP, HOTP or Steam, SHA1 / SHA256 / SHA512, 6 or 8 digits, any period or counter
 
 **Private & secure**
@@ -56,7 +58,7 @@
 - Secrets stored in the **macOS Keychain**, never in plain text on disk
 - Optional **Touch ID / password lock** for the whole list
 - **Protected tokens** — keep a single code hidden until you confirm with Touch ID
-- **Recovery codes** — keep a site's backup codes next to the token, in the Keychain, behind Touch ID
+- **Recovery codes** — keep a site's backup codes next to the token, in the Keychain, behind Touch ID; paste them or scan a screenshot
 - Touch ID required to show secrets and QR codes, export a backup or delete everything
 - Encrypted, password-protected backups
 - **No network connections** — nothing is synced, sent or uploaded
@@ -174,6 +176,14 @@ A pinned window stays open after **Enter**. The shortcut can be turned off in [s
   <img src="screenshots/keyboard.png" width="400" alt="Keyboard search with a selected row">
 </p>
 
+### Shortcuts and Siri
+
+macOS 13 and later. Turn on **Allow Shortcuts to read codes** in [settings](#menu-bar-menu--settings), then add the **Get GlassOTP Code** action in the Shortcuts app and pick an account. The action returns the current code; with **Copy to Clipboard** on it also copies it. Siri: *“Get a code in GlassOTP”*.
+
+- Protected tokens ask for Touch ID first. With **Require Touch ID to view** on, every token does.
+- An HOTP code counts as a copy: the counter moves if **HOTP: new code after each copy** is on.
+- The setting is off by default: while it's on, any shortcut on this Mac can read the codes of unprotected tokens.
+
 ## Adding tokens
 
 Press **+** in the top-right corner of the list to open the **Add Token** window.
@@ -217,6 +227,8 @@ You don't have to open the Add window at all:
 - **Drop onto the menu bar icon** — a QR image, a PDF, an `otpauth://` link, a `.maFile` or any export GlassOTP can [import](#from-another-authenticator-app). Files with a password ask for it first.
 
 Each time, GlassOTP opens and shows a line with the result — for example *Added “GitHub · me”* or *Already in GlassOTP*.
+
+Clicking an `otpauth://` or `otpauth-migration://` link in a browser, an email or a document opens the Add window with the link filled in. Check it and click **Add**.
 
 ### From the clipboard
 
@@ -286,6 +298,7 @@ Right-click a token:
 Sites that offer two-factor login usually give you a set of single-use **recovery codes** for when your authenticator isn't at hand. **Recovery Codes…** keeps them with the token.
 
 - Paste the codes as the site shows them — one per line, comma-separated or numbered, all work. Duplicates are skipped.
+- **Scan** reads the codes from a screenshot: **Select Area…** on the screen (needs Screen Recording) or an **Image File…** (image or PDF). You can also drop an image onto the field. The codes land in the field, not in the Keychain — check them (text recognition can mix up `O` and `0`), then click **Add codes**.
 - Mark a code as used with the circle next to it; **Copy** copies one code, **Copy unused** copies all remaining ones.
 - The codes are stored in the Keychain together with the secrets and open only after Touch ID. They are part of encrypted backups.
 
@@ -324,6 +337,7 @@ The **settings menu** (slider icon in the list):
 - **Global shortcut ⌥⌘O**
 - **Double ⌥⌘O to scan a QR code** — press the shortcut twice to scan a QR code anywhere on screen, see [From anywhere](#from-anywhere)
 - **Require Touch ID to view** — lock the list until you authenticate
+- **Allow Shortcuts to read codes** — macOS 13 and later, see [Shortcuts and Siri](#shortcuts-and-siri)
 - **Recently Deleted…** — [restore or erase deleted tokens](#recently-deleted)
 
 <p align="center">
@@ -353,8 +367,9 @@ From the right-click menu:
 - Backups are encrypted with **AES-GCM** using a key derived from your password with **Argon2id** (64 MB of memory per attempt, which makes guessing the password slow). Backups from earlier versions used PBKDF2-HMAC-SHA256 and still import. Without the password, a backup can't be read.
 - If macOS can't verify you (for example, the Mac has no login password), GlassOTP keeps everything locked instead of letting you through.
 - Copied codes are marked as sensitive, so well-behaved clipboard managers don't store them.
+- Shortcuts can't read any code until you turn on **Allow Shortcuts to read codes**; protected tokens still ask for Touch ID.
 - The clipboard is checked only when you open the list and only if it changed; an added `otpauth://` link is removed from it.
-- Screen scans never leave your Mac: they are read for QR codes and deleted right away. On macOS 15 and later, macOS periodically asks you to confirm GlassOTP's Screen Recording access.
+- Screen scans never leave your Mac: they are read for QR codes or recovery codes and deleted right away. Text recognition runs on the Mac. On macOS 15 and later, macOS periodically asks you to confirm GlassOTP's Screen Recording access.
 
 <p align="center">
   <img src="screenshots/locked.png" width="400" alt="Locked token list">
@@ -371,6 +386,7 @@ From the right-click menu:
 
 - **Screen scanning keeps asking for permission** — after allowing GlassOTP under Screen Recording, quit GlassOTP (right-click the key icon → **Exit**) and open it again; macOS applies the permission only to a fresh start.
 - **Add to GlassOTP is missing from the Services menu** — make sure GlassOTP is in your Applications folder and has been opened once, then enable it in System Settings → Keyboard → Keyboard Shortcuts → Services. If it still doesn't appear, log out and back in — macOS refreshes the Services list only then.
+- **An `otpauth://` link opens another app** — another authenticator on this Mac also handles these links and macOS chose it. Copy the link and use **Paste** in the Add window.
 - **⌥⌘O does nothing** — another app may already use this shortcut. Turn off **Global shortcut ⌥⌘O** in settings and use the menu bar icon instead.
 
 ## Notes & limitations
