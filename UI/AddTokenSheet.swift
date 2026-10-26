@@ -117,8 +117,15 @@ struct AddTokenSheet: View {
             HStack(spacing: 8) {
                 sourceButton("Image…", systemImage: "photo", action: importFromImageFile)
                 sourceButton("Paste", systemImage: "doc.on.clipboard", action: importFromClipboard)
-                sourceButton("Scan Screen", systemImage: "display", action: { scanScreen(selectingArea: false) })
-                    .disabled(scanningScreen)
+                Menu {
+                    Button("Whole Screen") { scanScreen(selectingArea: false) }
+                    Button("Select Area…") { scanScreen(selectingArea: true) }
+                } label: {
+                    Label("Screen", systemImage: "display")
+                }
+                .frame(maxWidth: .infinity)
+                .disabled(scanningScreen)
+                .help("Find a QR code on the whole screen, or select the area with the QR code")
                 sourceButton("Camera", systemImage: "camera", action: startCameraScanner)
             }
 
@@ -225,7 +232,7 @@ struct AddTokenSheet: View {
                 .foregroundColor(isDropping ? .accentColor : .secondary)
             Text("Drop a QR code image here")
                 .font(.system(size: 13, weight: .semibold))
-            Text("PNG, JPEG, HEIC, a screenshot or a Steam .maFile")
+            Text("PNG, JPEG, HEIC, PDF, a screenshot or a Steam .maFile")
                 .font(.footnote)
                 .foregroundColor(.secondary)
         }
@@ -482,7 +489,7 @@ struct AddTokenSheet: View {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.allowedFileTypes = ["png","jpg","jpeg","heic","tiff","bmp","gif"]
+        panel.allowedFileTypes = ["png","jpg","jpeg","heic","tiff","bmp","gif","pdf"]
         panel.begin { resp in
             guard resp == .OK, let url = panel.url else { return }
             self.importImage(at: url)
@@ -514,7 +521,7 @@ struct AddTokenSheet: View {
         }
         errorMessage = nil
         do {
-            let data = try Data(contentsOf: url)
+            let data = try FileImportService.readLimited(url)
             guard !SteamImport.looksEncrypted(data) else { throw SteamImportError.encryptedNeedsFolder }
             showResult(onAddMany([try SteamImport.token(fromMaFile: data)]), unsupported: 0)
         } catch {
@@ -523,6 +530,18 @@ struct AddTokenSheet: View {
     }
 
     private func importImage(at url: URL) {
+        guard url.pathExtension.lowercased() != QuickAdd.pdfExtension else {
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let links = try QRService.scanAllOtpauth(fromPDF: url)
+                    DispatchQueue.main.async { self.otpauthText = links.joined(separator: "\n") }
+                } catch {
+                    let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    DispatchQueue.main.async { self.showError(message) }
+                }
+            }
+            return
+        }
         guard let image = NSImage(contentsOf: url) else {
             showError(QRImportError.cannotReadImage.errorDescription)
             return

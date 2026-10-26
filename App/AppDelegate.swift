@@ -41,6 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let popover = sceneCoordinator?.popover {
             statusController = StatusBarController(popover: popover, store: store)
         }
+        NSApp.servicesProvider = statusController
+        NSUpdateDynamicServices()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

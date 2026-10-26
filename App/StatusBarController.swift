@@ -3,7 +3,7 @@ import SwiftUI
 import Combine
 
 final class StatusBarController: NSObject {
-    private let statusItem: NSStatusItem
+    let statusItem: NSStatusItem
     private let popover: NSPopover
     private var eventMonitor: Any?
     private var cancellable: AnyCancellable?
@@ -21,6 +21,8 @@ final class StatusBarController: NSObject {
     private var hotpCancellable: AnyCancellable?
     private var keyMonitor: Any?
     private var appToRestore: NSRunningApplication?
+    private var lastHotKeyPress: Date?
+    private static let doublePressInterval: TimeInterval = 0.35
 
     init(popover: NSPopover, store: OTPStore) {
         self.popover = popover
@@ -103,6 +105,7 @@ final class StatusBarController: NSObject {
         }
 
         store.timer.pause()
+        installDropTarget()
     }
 
     deinit {
@@ -170,8 +173,100 @@ final class StatusBarController: NSObject {
         hotKey = nil
         guard enabled else { return }
         hotKey = GlobalHotKey.optionCommandO { [weak self] in
-            self?.toggleFromHotKey()
+            self?.handleHotKey()
         }
+    }
+
+    private func handleHotKey() {
+        let now = Date()
+        if appState.doubleHotKeyScans, let last = lastHotKeyPress, now.timeIntervalSince(last) < Self.doublePressInterval {
+            lastHotKeyPress = nil
+            if popover.isShown { closePopover(sender: nil) }
+            startQuickScan()
+            return
+        }
+        lastHotKeyPress = now
+        toggleFromHotKey()
+    }
+
+    private func startQuickScan() {
+        guard ScreenQRScanner.hasPermission else {
+            ScreenQRScanner.requestPermission()
+            showQuickAddFeedback(QuickAdd.permissionNeeded)
+            return
+        }
+        ScreenQRScanner.scan(selectingArea: true) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let links):
+                self.process([QuickAdd.accounts(fromLinks: links)])
+            case .failure(.cancelled):
+                return
+            case .failure(.nothingFound):
+                self.showQuickAddFeedback(QuickAdd.nothingFound)
+            case .failure(let error):
+                self.showQuickAddFeedback(QuickAdd.failure(error.errorDescription ?? ""))
+            }
+        }
+    }
+
+    @objc func addToGlassOTP(_ pasteboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        quickAdd(QuickAddPayload.read(from: pasteboard))
+    }
+
+    func quickAdd(_ payload: QuickAddPayload) {
+        guard !payload.isEmpty else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let inputs = QuickAdd.inputs(from: payload)
+            DispatchQueue.main.async { self.process(inputs[...]) }
+        }
+    }
+
+    private func process(_ inputs: ArraySlice<QuickAddInput>) {
+        guard let input = inputs.first else { return }
+        let rest = inputs.dropFirst()
+        switch input {
+        case .accounts(let tokens, let unreadable):
+            showQuickAddFeedback(QuickAdd.add(tokens, unreadable: unreadable, to: store))
+            process(rest)
+        case .failure(let message):
+            showQuickAddFeedback(QuickAdd.failure(message))
+            process(rest)
+        case .file(let plan):
+            guard let prompt = plan.passwordPrompt else {
+                runQuickPlan(plan, password: nil) { self.process(rest) }
+                return
+            }
+            askPassword(title: prompt) { password in
+                self.runQuickPlan(plan, password: password) { self.process(rest) }
+            }
+        }
+    }
+
+    private func runQuickPlan(_ plan: FileImportPlan, password: String?, then next: @escaping () -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let parsed = try plan.read(password)
+                DispatchQueue.main.async {
+                    self.process([.accounts(parsed.tokens, unreadable: parsed.unsupported)])
+                    next()
+                }
+            } catch {
+                let text = Self.importErrorText(error)
+                DispatchQueue.main.async {
+                    self.showQuickAddFeedback(QuickAdd.failure(text))
+                    next()
+                }
+            }
+        }
+    }
+
+    private func showQuickAddFeedback(_ feedback: QuickAddFeedback) {
+        if !popover.isShown {
+            NSApp.activate(ignoringOtherApps: true)
+            showPopover(sender: nil)
+        }
+        NotificationCenter.default.post(name: .quickAddFeedback, object: feedback)
     }
 
     private func toggleFromHotKey() {

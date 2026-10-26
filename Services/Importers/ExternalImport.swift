@@ -6,6 +6,7 @@ enum ExternalImportError: Error, LocalizedError, Equatable {
     case noAccounts
     case nothingSupported(Int)
     case bitwardenEncrypted
+    case enteEncrypted
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,8 @@ enum ExternalImportError: Error, LocalizedError, Equatable {
             return "None of the \(count) account(s) can be added: GlassOTP supports TOTP, HOTP and Steam codes with SHA1/SHA256/SHA512 and 6 or 8 digits."
         case .bitwardenEncrypted:
             return "This Bitwarden export is password-protected. In Bitwarden, export the vault again as .json or .csv without a password, import it, then delete the file."
+        case .enteEncrypted:
+            return "Encrypted Ente Auth exports aren't supported yet. In Ente Auth, export as plain text, import that file, then delete it."
         }
     }
 }

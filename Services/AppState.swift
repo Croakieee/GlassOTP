@@ -12,6 +12,7 @@ final class AppState: ObservableObject {
     private let sortByUsageKey = "GlassOTP.sortByUsage"
     private let hotpAdvanceKey = "GlassOTP.hotpAdvancesOnCopy"
     private let clipboardKey = "GlassOTP.suggestFromClipboard"
+    private let doubleHotKeyKey = "GlassOTP.doubleHotKeyScans"
 
     @Published var pinPopover: Bool {
         didSet { UserDefaults.standard.set(pinPopover, forKey: pinKey) }
@@ -47,6 +48,10 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(suggestFromClipboard, forKey: clipboardKey) }
     }
 
+    @Published var doubleHotKeyScans: Bool {
+        didSet { UserDefaults.standard.set(doubleHotKeyScans, forKey: doubleHotKeyKey) }
+    }
+
     private init() {
         self.pinPopover = UserDefaults.standard.bool(forKey: pinKey)
         // Default ON to preserve existing behaviour; `object(forKey:)` distinguishes "unset" from "false".
@@ -57,6 +62,7 @@ final class AppState: ObservableObject {
         self.sortByUsage = UserDefaults.standard.object(forKey: sortByUsageKey) as? Bool ?? true
         self.hotpAdvancesOnCopy = UserDefaults.standard.object(forKey: hotpAdvanceKey) as? Bool ?? true
         self.suggestFromClipboard = UserDefaults.standard.object(forKey: clipboardKey) as? Bool ?? true
+        self.doubleHotKeyScans = UserDefaults.standard.object(forKey: doubleHotKeyKey) as? Bool ?? true
     }
 }
 

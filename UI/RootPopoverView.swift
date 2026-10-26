@@ -46,6 +46,8 @@ struct RootPopoverView: View {
 
     @State private var showTrash: Bool = false
     @StateObject private var clipboard = ClipboardSuggester()
+    @State private var quickAddFeedback: QuickAddFeedback?
+    @State private var quickAddGeneration = 0
     @State private var undoDeletedID: UUID?
 
     var body: some View {
@@ -129,6 +131,10 @@ struct RootPopoverView: View {
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .quickAddFeedback)) { note in
+            guard let feedback = note.object as? QuickAddFeedback else { return }
+            showQuickAddFeedback(feedback)
         }
         .onChange(of: appState.suggestFromClipboard) { _ in
             refreshClipboard()
@@ -236,6 +242,8 @@ struct RootPopoverView: View {
                 }
                 Toggle("Suggest accounts from clipboard", isOn: $appState.suggestFromClipboard)
                 Toggle("Global shortcut ⌥⌘O", isOn: $appState.globalHotKeyEnabled)
+                Toggle("Double ⌥⌘O to scan a QR code", isOn: $appState.doubleHotKeyScans)
+                    .disabled(!appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
                 Divider()
                 Button(store.trash.isEmpty ? "Recently Deleted" : "Recently Deleted (\(store.trash.count))…") {
@@ -268,6 +276,13 @@ struct RootPopoverView: View {
 
     @ViewBuilder
     private var warnings: some View {
+        if let quickAddFeedback {
+            QuickAddBanner(
+                feedback: quickAddFeedback,
+                showsDetails: showContent,
+                onOpenSettings: ScreenQRScanner.openPrivacySettings
+            )
+        }
         if showContent, let offer = clipboard.offer {
             ClipboardBanner(
                 offer: offer,
@@ -623,6 +638,17 @@ struct RootPopoverView: View {
 
         }
 
+    }
+
+    private func showQuickAddFeedback(_ feedback: QuickAddFeedback) {
+        quickAddFeedback = feedback
+        quickAddGeneration += 1
+        let generation = quickAddGeneration
+        let lifetime: TimeInterval = feedback.kind == .permission ? 15 : 6
+        DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
+            guard quickAddGeneration == generation else { return }
+            quickAddFeedback = nil
+        }
     }
 
     private func refreshClipboard() {
