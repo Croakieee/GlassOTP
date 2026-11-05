@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        LegacyDataMigration.runIfNeeded()
+
         NSApp.setActivationPolicy(.accessory)
 
         UNUserNotificationCenter.current().delegate = NotificationService.shared

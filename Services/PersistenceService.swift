@@ -42,6 +42,40 @@ struct PersistenceService {
     }
 }
 
+enum LegacyDataMigration {
+    static let legacyBundleID = "com.yourname.GlassOTP"
+    private static let doneKey = "GlassOTP.legacyMigrationDone"
+    private static let tokensKey = "GlassOTP.tokens.v1"
+
+    static func runIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard Bundle.main.bundleIdentifier != legacyBundleID,
+              !defaults.bool(forKey: doneKey) else { return }
+        defer { defaults.set(true, forKey: doneKey) }
+
+        guard defaults.object(forKey: tokensKey) == nil,
+              let url = legacyPreferencesURL,
+              let data = try? Data(contentsOf: url),
+              let plist = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
+        else { return }
+
+        for (key, value) in plist where key.hasPrefix("GlassOTP.") && key != doneKey {
+            defaults.set(value, forKey: key)
+        }
+
+        if LoginItem.isEnabled {
+            try? LoginItem.setEnabled(true)
+        }
+    }
+
+    private static var legacyPreferencesURL: URL? {
+        guard let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir else { return nil }
+        return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
+            .appendingPathComponent("Library/Containers/\(legacyBundleID)/Data/Library/Preferences", isDirectory: true)
+            .appendingPathComponent("\(legacyBundleID).plist")
+    }
+}
+
 private struct SalvagedTrashItem: Decodable {
     let item: TrashedToken?
 
