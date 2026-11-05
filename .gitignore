@@ -14,3 +14,10 @@ build/
 
 # Local signing overrides
 Local.xcconfig
+
+# Signing secrets
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.provisionprofile

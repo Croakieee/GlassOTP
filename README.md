@@ -79,7 +79,7 @@
 brew install --cask croakieee/tap/glassotp
 ```
 
-Update with `brew upgrade --cask glassotp`. The cask removes the quarantine flag after installation, so the Gatekeeper step below is not needed.
+Update with `brew upgrade --cask glassotp`.
 
 If Homebrew refuses to load the cask from an untrusted tap, run `brew trust --cask croakieee/tap/glassotp` once.
 
@@ -89,24 +89,17 @@ If Homebrew refuses to load the cask from an untrusted tap, run `brew trust --ca
 2. Move `GlassOTP.app` into your **Applications** folder.
 3. Open it — the key icon appears in the menu bar.
 
-### First launch (Gatekeeper)
+### Updating from 1.x
 
-GlassOTP is not distributed with an Apple Developer certificate, so macOS may block the first launch or say:
+GlassOTP 2.0 is signed with a Developer ID and notarized by Apple, so macOS opens it without the "damaged app" warning.
 
-> "The application is damaged and can't be opened. You should move it to the Trash."
+2.0 also has a new app ID, `io.github.croakieee.GlassOTP`. On the first launch it copies the token list, Recently Deleted and settings from 1.x; secrets stay in the Keychain where they were. Once after the update macOS may:
 
-This is the quarantine flag macOS adds to downloaded files, not actual damage. Run once in Terminal:
+- ask for your login password so GlassOTP can read the Keychain — choose **Always Allow**;
+- ask again for Screen Recording, Camera and notification access;
+- show GlassOTP under Login Items as a new item if **Launch at login** is on.
 
-```sh
-xattr -r -c /Applications/GlassOTP.app
-```
-
-Then open the app normally (or Control-click → **Open** the first time).
-
-Optional third-party helpers (not bundled with GlassOTP):
-
-- [Sentinel](https://github.com/alienator88/Sentinel) — removes the `com.apple.quarantine` attribute (macOS 13+).
-- AutoFix — clears quarantine attributes and fixes permissions on older systems.
+Export a backup before updating, just in case.
 
 ## Getting started
 
@@ -407,7 +400,9 @@ cd GlassOTP
 open GlassOTP.xcodeproj
 ```
 
-Build and run the **GlassOTP** scheme.
+Build and run the **GlassOTP** scheme. The project is set up with the author's signing team: pick your own team, or **Sign to Run Locally**, under Signing & Capabilities.
+
+Signed and notarized release archives are built with `scripts/release.sh`.
 
 ## Contributing
 
