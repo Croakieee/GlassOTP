@@ -81,6 +81,8 @@ brew install --cask croakieee/tap/glassotp
 
 Update with `brew upgrade --cask glassotp`. The cask removes the quarantine flag after installation, so the Gatekeeper step below is not needed.
 
+If Homebrew refuses to load the cask from an untrusted tap, run `brew trust --cask croakieee/tap/glassotp` once.
+
 ### Manual
 
 1. Download the release archive and extract it.
