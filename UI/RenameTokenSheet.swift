@@ -54,6 +54,6 @@ struct RenameTokenSheet: View {
             .padding(.top, 6)
         }
         .padding(16)
-        .frame(width: 420)
+        .frame(width: 340)
     }
 }

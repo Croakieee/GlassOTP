@@ -222,17 +222,15 @@ final class OTPStore: ObservableObject {
     }
 
     func deletePermanently(_ tokenID: UUID) {
-        guard let idx = trash.firstIndex(where: { $0.id == tokenID }) else { return }
+        guard let idx = trash.firstIndex(where: { $0.id == tokenID }),
+              (try? KeychainService.deleteSecret(for: tokenID)) != nil else { return }
         trash.remove(at: idx)
-        try? KeychainService.deleteSecret(for: tokenID)
         PersistenceService.save(trash: trash)
     }
 
     func emptyTrash() {
-        for item in trash {
-            try? KeychainService.deleteSecret(for: item.id)
-        }
-        trash.removeAll()
+        let deleted = Set(trash.filter { (try? KeychainService.deleteSecret(for: $0.id)) != nil }.map(\.id))
+        trash.removeAll { deleted.contains($0.id) }
         PersistenceService.save(trash: trash)
     }
 

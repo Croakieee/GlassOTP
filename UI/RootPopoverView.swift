@@ -105,6 +105,7 @@ struct RootPopoverView: View {
             refreshClipboard()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
+            revealedIDs = []
             applyLockOnOpen()
             refreshNotificationStatus()
             refreshClipboard()
@@ -128,6 +129,10 @@ struct RootPopoverView: View {
             keyboardCopy = nil
             revealedIDs = []
             undoDeletedID = nil
+            editSecretToken = nil
+            qrToken = nil
+            recoveryToken = nil
+            showTrash = false
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }

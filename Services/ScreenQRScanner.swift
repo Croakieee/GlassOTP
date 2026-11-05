@@ -57,7 +57,9 @@ enum ScreenQRScanner {
                 let result = images(selectingArea: selectingArea, screens: screens, capture: runScreencapture).flatMap(read)
                 DispatchQueue.main.async {
                     hidden.forEach { $0.orderFront(nil) }
-                    NSApp.activate(ignoringOtherApps: true)
+                    if !hidden.isEmpty || result.isCaptured {
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
                     hidden.first?.makeKey()
                     completion(result)
                 }
@@ -103,5 +105,12 @@ enum ScreenQRScanner {
         } catch {
             return false
         }
+    }
+}
+
+private extension Result where Failure == ScreenScanError {
+    var isCaptured: Bool {
+        if case .failure(.cancelled) = self { return false }
+        return true
     }
 }

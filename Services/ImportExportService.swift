@@ -50,10 +50,11 @@ struct ImportExportService {
 
     // Универсальный вход: обычная otpauth или migration-ссылка
     static func parseOtpauthOrMigration(_ urlString: String) throws -> ParsedLink {
-        guard let url = URL(string: urlString) else { throw ImportError.invalidURL }
+        let link = normalizedLink(urlString)
+        guard let url = URL(string: link) else { throw ImportError.invalidURL }
         let scheme = url.scheme?.lowercased() ?? ""
         if scheme == "otpauth" {
-            return ParsedLink(tokens: [try parseOtpauth(urlString)], unsupported: 0)
+            return ParsedLink(tokens: [try parseOtpauth(link)], unsupported: 0)
         } else if scheme == "otpauth-migration" {
             return try parseMigration(url)
         } else {
@@ -62,12 +63,22 @@ struct ImportExportService {
     }
 
     // Обычная otpauth://totp/...
+    static func normalizedLink(_ link: String) -> String {
+        let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        let escaped = strayPercent.stringByReplacingMatches(in: trimmed, range: range, withTemplate: "%25")
+        return escaped.addingPercentEncoding(withAllowedCharacters: linkCharacters) ?? escaped
+    }
+
+    private static let linkCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?@!$&'()*+,;=%")
+    private static let strayPercent = try! NSRegularExpression(pattern: "%(?![0-9A-Fa-f]{2})")
+
     static func parseOtpauth(_ urlString: String) throws -> ImportedToken {
-        guard let url = URL(string: urlString) else { throw ImportError.invalidURL }
+        guard let url = URL(string: normalizedLink(urlString)) else { throw ImportError.invalidURL }
         guard url.scheme?.lowercased() == "otpauth" else { throw ImportError.invalidURL }
         guard let declaredKind = OTPKind(rawValue: url.host?.lowercased() ?? "") else { throw ImportError.unsupportedType }
 
-        let rawLabel = url.path.removingPercentEncoding?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+        let rawLabel = (url.path.removingPercentEncoding ?? url.path).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         var issuerFromLabel = ""
         var accountFromLabel = ""
         if !rawLabel.isEmpty {
@@ -89,8 +100,8 @@ struct ImportExportService {
         guard let secretStr = q["secret"], !secretStr.isEmpty else { throw ImportError.missingSecret }
         guard let secret = Base32.decode(secretStr), !secret.isEmpty else { throw ImportError.badBase32 }
 
-        let issuerParam = q["issuer"]?.removingPercentEncoding ?? ""
-        let accountParam = q["account"]?.removingPercentEncoding ?? ""
+        let issuerParam = q["issuer"].map { $0.removingPercentEncoding ?? $0 } ?? ""
+        let accountParam = q["account"].map { $0.removingPercentEncoding ?? $0 } ?? ""
         let issuer = issuerParam.isEmpty ? issuerFromLabel : issuerParam
         let account = accountParam.isEmpty ? accountFromLabel : accountParam
         let kind = isSteam(declaredKind, issuer: issuer, query: q) ? OTPKind.steam : declaredKind

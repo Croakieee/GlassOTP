@@ -7,9 +7,15 @@ enum ScryptError: Error {
 enum Scrypt {
     private static let maxMemory = 512 * 1024 * 1024
 
+    private static func memory(r: Int, n: Int) -> Int? {
+        let (block, blockOverflow) = r.multipliedReportingOverflow(by: 128)
+        let (total, totalOverflow) = block.multipliedReportingOverflow(by: n)
+        return blockOverflow || totalOverflow ? nil : total
+    }
+
     static func derive(password: Data, salt: Data, n: Int, r: Int, p: Int, length: Int) throws -> Data {
-        guard n > 1, n & (n - 1) == 0, r > 0, p > 0, length > 0,
-              128 * r * n <= maxMemory, p <= 16 else { throw ScryptError.invalidParameters }
+        guard n > 1, n & (n - 1) == 0, r > 0, p > 0, length > 0, p <= 16,
+              let needed = memory(r: r, n: n), needed <= maxMemory else { throw ScryptError.invalidParameters }
 
         let blockWords = 32 * r
         var b = words(pbkdf2SHA256(password: password, salt: salt, length: p * 128 * r))
