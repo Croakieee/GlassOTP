@@ -402,8 +402,6 @@ open GlassOTP.xcodeproj
 
 Build and run the **GlassOTP** scheme. The project is set up with the author's signing team: pick your own team, or **Sign to Run Locally**, under Signing & Capabilities.
 
-Signed and notarized release archives are built with `scripts/release.sh`.
-
 ## Contributing
 
 Pull requests and improvements are welcome.
