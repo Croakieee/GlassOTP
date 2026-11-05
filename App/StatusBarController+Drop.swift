@@ -1,6 +1,6 @@
 import AppKit
 
-extension StatusBarController: NSWindowDelegate {
+extension StatusBarController: NSWindowDelegate, NSDraggingDestination {
     private static let dropTypes: [NSPasteboard.PasteboardType] = [.fileURL, .URL, .string, .tiff, .png]
     private static let dropSetupAttempts = 5
 

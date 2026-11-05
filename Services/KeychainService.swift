@@ -67,11 +67,12 @@ struct KeychainService {
         lock.lock()
         defer { lock.unlock() }
         try loadVaultLocked()
-        vault?[id.uuidString] = secret
+        var updated = vault ?? [:]
+        updated[id.uuidString] = secret
         if let recoveryCodes {
-            vault?[recoveryKey(for: id)] = recoveryCodes
+            updated[recoveryKey(for: id)] = recoveryCodes
         }
-        try persistVaultLocked()
+        try storeLocked(updated)
     }
 
     static func setRecoveryCodes(_ data: Data?, for id: UUID) throws {
@@ -79,8 +80,9 @@ struct KeychainService {
         defer { lock.unlock() }
         try loadVaultLocked()
         guard vault?[recoveryKey(for: id)] != data else { return }
-        vault?[recoveryKey(for: id)] = data
-        try persistVaultLocked()
+        var updated = vault ?? [:]
+        updated[recoveryKey(for: id)] = data
+        try storeLocked(updated)
     }
 
     static func recoveryCodes(for id: UUID) throws -> Data? {
@@ -108,10 +110,11 @@ struct KeychainService {
         lock.lock()
         defer { lock.unlock() }
         try loadVaultLocked()
-        let removedSecret = vault?.removeValue(forKey: id.uuidString)
-        let removedCodes = vault?.removeValue(forKey: recoveryKey(for: id))
+        var updated = vault ?? [:]
+        let removedSecret = updated.removeValue(forKey: id.uuidString)
+        let removedCodes = updated.removeValue(forKey: recoveryKey(for: id))
         if removedSecret != nil || removedCodes != nil {
-            try persistVaultLocked()
+            try storeLocked(updated)
         }
     }
 
@@ -135,7 +138,7 @@ struct KeychainService {
         vault = [:]
         pendingLegacyAccounts = []
         loadFailure = nil
-        try persistVaultLocked()
+        try persistVaultLocked([:])
     }
 
     static func retryAccess() {
@@ -172,11 +175,16 @@ struct KeychainService {
         let legacy = readLegacyItems()
         vault = legacy.secrets
         pendingLegacyAccounts = legacy.accounts
-        try? persistVaultLocked()
+        try? persistVaultLocked(legacy.secrets)
     }
 
-    private static func persistVaultLocked() throws {
-        let data = try JSONEncoder().encode(vault ?? [:])
+    private static func storeLocked(_ updated: [String: Data]) throws {
+        try persistVaultLocked(updated)
+        vault = updated
+    }
+
+    private static func persistVaultLocked(_ contents: [String: Data]) throws {
+        let data = try JSONEncoder().encode(contents)
         try writeItem(account: vaultAccount, data: data)
 
         if !pendingLegacyAccounts.isEmpty {

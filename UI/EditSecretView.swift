@@ -38,8 +38,10 @@ struct EditSecretView: View {
                     do {
                         try store.updateSecret(for: token, base32: secret)
                         onClose()
-                    } catch {
+                    } catch ImportError.badBase32 {
                         errorMessage = "Invalid Base32"
+                    } catch {
+                        errorMessage = "Couldn't save to the Keychain: \(error.localizedDescription)"
                     }
 
                 }

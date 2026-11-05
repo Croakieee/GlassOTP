@@ -1,12 +1,20 @@
 import Foundation
 
 enum LinkListImport {
+    private static let trailingPunctuation = CharacterSet(charactersIn: ".,;:!?)]}")
     private static let pattern = try! NSRegularExpression(pattern: "otpauth(?:-migration)?://[^\\s\"'<>]+", options: [.caseInsensitive])
 
     static func links(in text: String) -> [String] {
-        let range = NSRange(text.startIndex..., in: text)
-        return pattern.matches(in: text, range: range).compactMap { match in
-            Range(match.range, in: text).map { String(text[$0]) }
+        text.components(separatedBy: .newlines).flatMap { line -> [String] in
+            let range = NSRange(line.startIndex..., in: line)
+            let found = pattern.matches(in: line, range: range).compactMap { match in
+                Range(match.range, in: line).map { String(line[$0]).trimmingCharacters(in: trailingPunctuation) }
+            }
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard found.count == 1, trimmed != found[0], trimmed.lowercased().hasPrefix("otpauth"),
+                  (try? ImportExportService.parseOtpauthOrMigration(found[0])) == nil,
+                  (try? ImportExportService.parseOtpauthOrMigration(trimmed)) != nil else { return found }
+            return [trimmed]
         }
     }
 

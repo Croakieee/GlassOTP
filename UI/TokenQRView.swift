@@ -40,12 +40,13 @@ struct TokenQRView: View {
         .frame(width: 300)
     }
 
+    private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
     private func generateQR() -> NSImage? {
         guard let secret = store.secret(for: token) else { return nil }
 
         // Label path components must encode `:` (issuer:account separator) and `/` (path separator).
-        var labelCharSet = CharacterSet.urlQueryAllowed
-        labelCharSet.remove(charactersIn: ":/")
+        let labelCharSet = Self.unreserved
 
         let issuerEncoded  = token.issuer.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
         let accountEncoded = token.account.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
@@ -59,7 +60,7 @@ struct TokenQRView: View {
             label = "\(issuerEncoded):\(accountEncoded)"
         }
 
-        let issuerQuery = token.issuer.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let issuerQuery = token.issuer.addingPercentEncoding(withAllowedCharacters: Self.unreserved) ?? ""
         // algorithm must be included — otherwise a re-scanned SHA256/SHA512 token is read back as SHA1.
         let url: String
         switch token.kind {

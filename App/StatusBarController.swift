@@ -146,6 +146,7 @@ final class StatusBarController: NSObject {
     // While Touch ID / password auth is on screen, stop the popover from auto-closing
     // (the auth dialog steals focus, which would dismiss a transient popover).
     @objc private func suspendAutoClose() {
+        cancelAutoClose()
         popover.behavior = .applicationDefined
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
@@ -195,7 +196,7 @@ final class StatusBarController: NSObject {
             showQuickAddFeedback(QuickAdd.permissionNeeded)
             return
         }
-        ScreenQRScanner.scan(selectingArea: true) { [weak self] result in
+        ScreenQRScanner.capture(selectingArea: true, hidingWindows: false, read: ScreenQRScanner.links(in:)) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let links):
@@ -237,7 +238,7 @@ final class StatusBarController: NSObject {
                 runQuickPlan(plan, password: nil) { self.process(rest) }
                 return
             }
-            askPassword(title: prompt) { password in
+            askPassword(title: prompt, onCancel: { self.process(rest) }) { password in
                 self.runQuickPlan(plan, password: password) { self.process(rest) }
             }
         }
@@ -326,6 +327,7 @@ final class StatusBarController: NSObject {
 
         // вернуть приложение обратно в "background"
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard AddTokenWindowController.shared.window == nil else { return }
             NSApp.setActivationPolicy(.accessory)
         }
     }
@@ -559,6 +561,7 @@ final class StatusBarController: NSObject {
     private func askPassword(confirm: Bool = false,
                              title: String? = nil,
                              errorText: String? = nil,
+                             onCancel: @escaping () -> Void = {},
                              completion: @escaping (String) -> Void) {
         let alert = NSAlert()
         alert.messageText = title ?? (confirm ? "Set backup password" : "Enter password")
@@ -598,7 +601,10 @@ final class StatusBarController: NSObject {
         alert.addButton(withTitle: "Cancel")
 
         NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            onCancel()
+            return
+        }
 
         let password = pwField.stringValue
 
