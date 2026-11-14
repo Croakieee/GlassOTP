@@ -254,6 +254,22 @@ Export your accounts in the other app, then right-click the key icon → **Impor
 - Accounts GlassOTP can't generate codes for (for example Yandex, mOTP or 7-digit codes) are skipped and counted in the result.
 - Delete the export file afterwards — it contains your secrets.
 
+### Link a Steam account
+
+GlassOTP doesn't connect to Steam, so it can't link an account by itself. Link it with [steamguard-cli](https://github.com/dyc3/steamguard-cli) and import the result:
+
+```sh
+brew install steamguard-cli
+steamguard --mafiles-path ~/Desktop/maFiles setup
+```
+
+1. Sign in when asked and enter the code Steam sends you. Don't set an encryption passkey yet — GlassOTP reads unencrypted steamguard-cli files.
+2. Write down the **revocation code** (`R12345`) somewhere off this Mac. Without it, losing the secret means a long account recovery.
+3. In GlassOTP: right-click the key icon → **Import** → choose `~/Desktop/maFiles`.
+4. Check that GlassOTP shows the same code as `steamguard --mafiles-path ~/Desktop/maFiles code`.
+
+The Steam app on your phone stops being the authenticator. Trade and market confirmations: `steamguard --mafiles-path ~/Desktop/maFiles confirm`. If you keep the folder for that, encrypt it with `steamguard --mafiles-path ~/Desktop/maFiles encrypt`; if not, delete it.
+
 ### From Steam Desktop Authenticator
 
 Right-click the key icon → **Import** and choose a `.maFile` or the whole `maFiles` folder.
