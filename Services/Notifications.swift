@@ -15,6 +15,7 @@ extension Notification.Name {
 
 enum PopoverUserInfo {
     static let openedViaHotKey = "openedViaHotKey"
+    static let unlockPromptDelay = "unlockPromptDelay"
 }
 
 enum PopoverKeyCommand {

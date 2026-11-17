@@ -347,7 +347,8 @@ The **settings menu** (slider icon in the list):
 - **Suggest accounts from clipboard** — offer accounts from a copied link or QR screenshot, see [From the clipboard](#from-the-clipboard)
 - **Global shortcut ⌥⌘O**
 - **Double ⌥⌘O to scan a QR code** — press the shortcut twice to scan a QR code anywhere on screen, see [From anywhere](#from-anywhere)
-- **Require Touch ID to view** — lock the list until you authenticate
+- **Require Touch ID to view** — lock the list until you authenticate; Touch ID is asked for as soon as you open the list
+- **Stay unlocked** — shown when the lock is on: ask every time (default), or keep the list unlocked for 1, 5 or 15 minutes after you authenticate. Locking the screen or putting the Mac to sleep locks it again
 - **Allow Shortcuts to read codes** — macOS 13 and later, see [Shortcuts and Siri](#shortcuts-and-siri)
 - **Recently Deleted…** — [restore or erase deleted tokens](#recently-deleted)
 
@@ -372,7 +373,7 @@ From the right-click menu:
 - Token secrets live in the **macOS Keychain**, never as plain text on disk.
 - GlassOTP makes **no network connections** — all data stays on your Mac.
 - **Touch ID** or your macOS password is required to view or edit a secret, show a QR code, open recovery codes, export a backup and delete all tokens. Authentication is remembered for a short time to avoid repeated prompts — except for protected tokens and recovery codes, which always ask.
-- **Require Touch ID to view** hides all codes until you authenticate, every time the list opens.
+- **Require Touch ID to view** hides all codes until you authenticate, every time the list opens — or, with **Stay unlocked**, for up to 15 minutes after you authenticate. Locking the screen or sleep locks it again. Protected tokens and recovery codes always ask.
 - **Protected tokens** stay hidden behind Touch ID even when the list itself is open.
 - **Recovery codes** are kept in the Keychain next to the secrets, never in plain text on disk.
 - Backups are encrypted with **AES-GCM** using a key derived from your password with **Argon2id** (64 MB of memory per attempt, which makes guessing the password slow). Backups from earlier versions used PBKDF2-HMAC-SHA256 and still import. Without the password, a backup can't be read.

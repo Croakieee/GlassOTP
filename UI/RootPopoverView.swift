@@ -17,6 +17,8 @@ struct RootPopoverView: View {
     // `unlocked` holds only for the current open session: it's reset on every popover close.
     @State private var unlocked: Bool = false
     @State private var authInProgress: Bool = false
+    @State private var unlockPromptID: UUID?
+    @State private var unlockedUntil: Date?
 
     // rename
     @State private var renameHandle: RenameHandle?
@@ -106,11 +108,15 @@ struct RootPopoverView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
             revealedIDs = []
+            unlockPromptID = nil
             applyLockOnOpen()
             refreshNotificationStatus()
             refreshClipboard()
             keyboardActive = note.userInfo?[PopoverUserInfo.openedViaHotKey] as? Bool ?? false
             selectedID = store.filteredTokens().first?.id
+            if let delay = note.userInfo?[PopoverUserInfo.unlockPromptDelay] as? NSNumber {
+                promptUnlockOnOpen(after: delay.doubleValue)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverKeyCommand)) { note in
             guard let command = note.object as? PopoverKeyCommand else { return }
@@ -133,6 +139,7 @@ struct RootPopoverView: View {
             qrToken = nil
             recoveryToken = nil
             showTrash = false
+            unlockPromptID = nil
             // Re-lock whenever the popover closes so the next open requires auth again.
             guard !authInProgress else { return }
             if appState.requireUnlock { unlocked = false }
@@ -147,6 +154,26 @@ struct RootPopoverView: View {
         .onChange(of: appState.requireUnlock) { enabled in
             // Enabling locks immediately; disabling reveals the content.
             unlocked = !enabled
+            unlockedUntil = nil
+        }
+        .onChange(of: appState.stayUnlockedMinutes) { _ in
+            if appState.requireUnlock && unlocked {
+                startStayingUnlocked()
+            } else {
+                unlockedUntil = nil
+            }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
+            relock()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.screensDidSleepNotification)) { _ in
+            relock()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.sessionDidResignActiveNotification)) { _ in
+            relock()
+        }
+        .onReceive(DistributedNotificationCenter.default().publisher(for: Notification.Name("com.apple.screenIsLocked"))) { _ in
+            relock()
         }
 
         .sheet(item: $renameHandle, onDismiss: {
@@ -250,6 +277,13 @@ struct RootPopoverView: View {
                 Toggle("Double ⌥⌘O to scan a QR code", isOn: $appState.doubleHotKeyScans)
                     .disabled(!appState.globalHotKeyEnabled)
                 Toggle("Require Touch ID to view", isOn: requireUnlockBinding)
+                if appState.requireUnlock {
+                    Menu("Stay unlocked") {
+                        ForEach(AppState.stayUnlockedChoices, id: \.self) { minutes in
+                            Toggle(minutes == 0 ? "Ask every time" : "For \(minutes) min", isOn: stayUnlockedBinding(minutes))
+                        }
+                    }
+                }
                 if #available(macOS 13, *) {
                     Toggle("Allow Shortcuts to read codes", isOn: $appState.shortcutsReadCodes)
                 }
@@ -421,13 +455,49 @@ struct RootPopoverView: View {
     }
 
     /// Locks on every fresh popover open — the unlocked state never persists across opens.
-    /// Does NOT auto-prompt; the user taps Unlock when ready.
     private func applyLockOnOpen() {
-        if appState.requireUnlock { unlocked = false }
+        if appState.requireUnlock { unlocked = isStayingUnlocked }
     }
 
     private func promptUnlock() {
-        runLockAuth { unlocked = true }
+        runLockAuth {
+            unlocked = true
+            startStayingUnlocked()
+        }
+    }
+
+    private var isStayingUnlocked: Bool {
+        guard let unlockedUntil else { return false }
+        return unlockedUntil > Date()
+    }
+
+    private func startStayingUnlocked() {
+        let minutes = appState.stayUnlockedMinutes
+        unlockedUntil = minutes > 0 ? Date().addingTimeInterval(TimeInterval(minutes * 60)) : nil
+    }
+
+    private func relock() {
+        unlockedUntil = nil
+        guard appState.requireUnlock, !authInProgress else { return }
+        unlocked = false
+    }
+
+    private func stayUnlockedBinding(_ minutes: Int) -> Binding<Bool> {
+        Binding(
+            get: { appState.stayUnlockedMinutes == minutes },
+            set: { if $0 { appState.stayUnlockedMinutes = minutes } }
+        )
+    }
+
+    private func promptUnlockOnOpen(after delay: TimeInterval) {
+        guard appState.requireUnlock, !unlocked else { return }
+        let id = UUID()
+        unlockPromptID = id
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard unlockPromptID == id, appState.requireUnlock, !unlocked else { return }
+            unlockPromptID = nil
+            promptUnlock()
+        }
     }
 
     /// Binding for the "Require Touch ID" toggle. Turning it ON is free; turning it OFF
