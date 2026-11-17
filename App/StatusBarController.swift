@@ -279,7 +279,7 @@ final class StatusBarController: NSObject {
         let isSelf = frontmost?.processIdentifier == NSRunningApplication.current.processIdentifier
         appToRestore = isSelf ? nil : frontmost
         NSApp.activate(ignoringOtherApps: true)
-        showPopover(sender: nil, viaHotKey: true)
+        showPopover(sender: nil, viaHotKey: true, promptsUnlock: true)
     }
 
     private func restorePreviousApp() {
@@ -660,11 +660,11 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             closePopover(sender: sender)
         } else {
-            showPopover(sender: sender)
+            showPopover(sender: sender, promptsUnlock: true)
         }
     }
 
-    private func showPopover(sender: Any?, viaHotKey: Bool = false) {
+    private func showPopover(sender: Any?, viaHotKey: Bool = false, promptsUnlock: Bool = false) {
         guard let button = statusItem.button else { return }
 
         cancelAutoClose()
@@ -677,10 +677,15 @@ final class StatusBarController: NSObject {
 
         // Re-evaluate the lock each time the popover opens (NSPopover doesn't reliably
         // re-fire SwiftUI .onAppear on subsequent shows).
+        var userInfo: [String: Any] = [PopoverUserInfo.openedViaHotKey: viaHotKey]
+        if promptsUnlock {
+            let waitsForSecondPress = viaHotKey && appState.doubleHotKeyScans
+            userInfo[PopoverUserInfo.unlockPromptDelay] = waitsForSecondPress ? Self.doublePressInterval : 0
+        }
         NotificationCenter.default.post(
             name: .popoverDidShow,
             object: nil,
-            userInfo: [PopoverUserInfo.openedViaHotKey: viaHotKey]
+            userInfo: userInfo
         )
     }
 
