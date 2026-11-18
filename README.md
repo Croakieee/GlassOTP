@@ -85,8 +85,8 @@ If Homebrew refuses to load the cask from an untrusted tap, run `brew trust --ca
 
 ### Manual
 
-1. Download the release archive and extract it.
-2. Move `GlassOTP.app` into your **Applications** folder.
+1. Download `GlassOTP.dmg` from the [latest release](https://github.com/Croakieee/GlassOTP/releases/latest) and open it (or download `GlassOTP.zip` and extract it).
+2. Drag `GlassOTP.app` into your **Applications** folder.
 3. Open it — the key icon appears in the menu bar.
 
 ### Updating from 1.x
