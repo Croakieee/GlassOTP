@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-universal-555?style=flat-square" alt="Universal">
   <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift">
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License">
+  <a href="https://appstorrent.ru/6136-glassotp.html"><img src="badges/appstorrent.svg" alt="Available on appstorrent"></a>
 </p>
 
 <p align="center">
