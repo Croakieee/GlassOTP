@@ -73,6 +73,36 @@ struct ImportExportService {
     private static let linkCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?@!$&'()*+,;=%")
     private static let strayPercent = try! NSRegularExpression(pattern: "%(?![0-9A-Fa-f]{2})")
 
+    private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    static func link(for token: OTPToken, secret: String) -> String {
+        // Label path components must encode `:` (issuer:account separator) and `/` (path separator).
+        let labelCharSet = Self.unreserved
+
+        let issuerEncoded  = token.issuer.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
+        let accountEncoded = token.account.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
+
+        let label: String
+        if issuerEncoded.isEmpty {
+            label = accountEncoded
+        } else if accountEncoded.isEmpty {
+            label = issuerEncoded
+        } else {
+            label = "\(issuerEncoded):\(accountEncoded)"
+        }
+
+        let issuerQuery = token.issuer.addingPercentEncoding(withAllowedCharacters: Self.unreserved) ?? ""
+        // algorithm must be included — otherwise a re-scanned SHA256/SHA512 token is read back as SHA1.
+        switch token.kind {
+        case .steam:
+            return "otpauth://steam/\(label)?secret=\(secret)&issuer=\(issuerQuery)"
+        case .hotp:
+            return "otpauth://hotp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&counter=\(token.counter)&digits=\(token.digits)"
+        case .totp:
+            return "otpauth://totp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&period=\(token.period)&digits=\(token.digits)"
+        }
+    }
+
     static func parseOtpauth(_ urlString: String) throws -> ImportedToken {
         guard let url = URL(string: normalizedLink(urlString)) else { throw ImportError.invalidURL }
         guard url.scheme?.lowercased() == "otpauth" else { throw ImportError.invalidURL }

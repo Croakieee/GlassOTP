@@ -11,6 +11,8 @@ extension Notification.Name {
     static let popoverKeyCommand = Notification.Name("popoverKeyCommand")
     static let keyboardCopyDone = Notification.Name("keyboardCopyDone")
     static let quickAddFeedback = Notification.Name("quickAddFeedback")
+    static let backupRequested = Notification.Name("backupRequested")
+    static let backupMade = Notification.Name("backupMade")
 }
 
 enum PopoverUserInfo {

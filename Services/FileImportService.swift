@@ -12,7 +12,7 @@ enum FileImportError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupported:
-            return "GlassOTP can't read this file. Supported: GlassOTP backups, 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth (plain text), Bitwarden (.json or .csv), Steam Desktop Authenticator, images and PDFs with QR codes, and text files with otpauth:// links."
+            return "GlassOTP can't read this file. Supported: GlassOTP backups, 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth (plain text), Bitwarden (.json or .csv), Apple Passwords and KeePassXC (.csv), 1Password (.1pux), Steam Desktop Authenticator, images and PDFs with QR codes, and text files with otpauth:// links."
         case .tooLarge:
             return "This file is too large to be an authenticator export."
         }
@@ -20,7 +20,7 @@ enum FileImportError: Error, LocalizedError {
 }
 
 enum FileImportService {
-    static let fileTypes = ["glassotp", "maFile", "mafile", "json", "2fas", "authpro", "bin", "csv", "txt"]
+    static let fileTypes = ["glassotp", "maFile", "mafile", "json", "2fas", "authpro", "bin", "csv", "txt", PasswordManagerImport.onePasswordExtension]
     static let backupPrompt = "Enter password"
     static let steamPrompt = "Enter the Steam Desktop Authenticator encryption passkey"
     static let twoFASPrompt = "Enter the 2FAS backup password"
@@ -30,17 +30,23 @@ enum FileImportService {
 
     static let maxFileSize = 10 * 1024 * 1024
 
-    static func readLimited(_ url: URL) throws -> Data {
+    static func readLimited(_ url: URL, limit: Int = maxFileSize) throws -> Data {
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-        guard size <= maxFileSize else { throw FileImportError.tooLarge }
-        let data = try Data(contentsOf: url)
-        guard data.count <= maxFileSize else { throw FileImportError.tooLarge }
+        guard size <= limit else { throw FileImportError.tooLarge }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        guard data.count <= limit else { throw FileImportError.tooLarge }
         return data
     }
 
     static func plan(for url: URL) throws -> FileImportPlan {
         if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
             return try folderPlan(url)
+        }
+
+        if url.pathExtension.lowercased() == PasswordManagerImport.onePasswordExtension {
+            let archive = try readLimited(url, limit: PasswordManagerImport.maxOnePasswordSize)
+            guard PasswordManagerImport.isOnePassword(archive) else { throw FileImportError.unsupported }
+            return FileImportPlan(passwordPrompt: nil) { _ in try PasswordManagerImport.readOnePassword(archive) }
         }
 
         let data = try readLimited(url)
@@ -69,6 +75,9 @@ enum FileImportService {
         if let text = String(data: data, encoding: .utf8) {
             if BitwardenImport.matchesCSV(text) {
                 return FileImportPlan(passwordPrompt: nil) { _ in try BitwardenImport.readCSV(text) }
+            }
+            if PasswordManagerImport.matchesCSV(text) {
+                return FileImportPlan(passwordPrompt: nil) { _ in try PasswordManagerImport.readCSV(text) }
             }
             if !LinkListImport.links(in: text).isEmpty {
                 return FileImportPlan(passwordPrompt: nil) { _ in try LinkListImport.read(text) }
