@@ -81,7 +81,9 @@ enum PasswordManagerImport {
     }
 
     private static func column(_ names: [String], in header: [String]) -> Int? {
-        let normalized = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        let normalized = header.map {
+            $0.replacingOccurrences(of: "\u{FEFF}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
         for name in names {
             if let index = normalized.firstIndex(of: name) { return index }
         }

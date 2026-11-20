@@ -382,6 +382,10 @@ Right-click the key icon → **Print Backup…** and authenticate. Every account
 - The print dialog shows a preview and can also save a PDF. That file is as sensitive as the paper — don't leave it on your Mac.
 - HOTP cards show the counter at the time of printing.
 
+<p align="center">
+  <img src="screenshots/paper-backup.png" width="560" alt="Paper backup page">
+</p>
+
 ### Backup reminder
 
 When accounts were added since the last export or paper backup, the list shows a short line with a **Back Up…** button. Click **×** to hide it until you add another account.

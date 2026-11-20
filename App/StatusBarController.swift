@@ -61,7 +61,7 @@ final class StatusBarController: NSObject {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(exportTokens),
+            selector: #selector(handleBackupRequested),
             name: .backupRequested,
             object: nil
         )
@@ -358,8 +358,8 @@ final class StatusBarController: NSObject {
         menu.addItem(.separator())
 
         menu.addItem(item("Export", #selector(exportTokens)))
-        menu.addItem(item("Print Backup…", #selector(printBackup)))
         menu.addItem(item("Import", #selector(importTokens)))
+        menu.addItem(item("Print Backup…", #selector(printBackup)))
 
         menu.addItem(.separator())
 
@@ -437,6 +437,11 @@ final class StatusBarController: NSObject {
             title: "All tokens deleted",
             body: "\(count) tokens removed"
         )
+    }
+
+    @objc private func handleBackupRequested() {
+        if popover.isShown { closePopover(sender: nil) }
+        exportTokens()
     }
 
     @objc private func exportTokens() {

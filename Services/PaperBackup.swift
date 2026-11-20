@@ -155,7 +155,7 @@ enum PaperBackup {
     private static func details(_ token: OTPToken) -> String {
         switch token.kind {
         case .steam:
-            return "Steam Guard"
+            return "Steam Guard · scan the QR code with GlassOTP"
         case .hotp:
             return "HOTP · \(token.algorithm.rawValue) · \(token.digits) digits · counter \(token.counter) when printed"
         case .totp:
