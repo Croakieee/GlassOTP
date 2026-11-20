@@ -1,0 +1,52 @@
+name: Bug report
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never paste secrets, otpauth:// links, QR codes, backups or export files here.
+  - type: input
+    id: version
+    attributes:
+      label: GlassOTP version
+      placeholder: "2.0.2"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.6, Apple Silicon"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - Homebrew
+        - GitHub release (DMG or ZIP)
+        - Built from source
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Error text, screenshots (with codes hidden), the app you imported from.
