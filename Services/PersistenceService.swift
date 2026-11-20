@@ -42,6 +42,36 @@ struct PersistenceService {
     }
 }
 
+enum BackupReminder {
+    enum Status: Equatable {
+        case noRecord
+        case newAccounts(Int)
+    }
+
+    private static let backedUpKey = "GlassOTP.backedUpTokens"
+    private static let dismissedKey = "GlassOTP.backupReminderDismissed"
+
+    static func status(for tokens: [OTPToken]) -> Status? {
+        let ids = Set(tokens.map(\.id.uuidString))
+        guard !ids.isEmpty else { return nil }
+        let defaults = UserDefaults.standard
+        if let dismissed = defaults.stringArray(forKey: dismissedKey), ids.isSubset(of: Set(dismissed)) { return nil }
+        guard let backedUp = defaults.stringArray(forKey: backedUpKey) else { return .noRecord }
+        let missing = ids.subtracting(backedUp).count
+        return missing > 0 ? .newAccounts(missing) : nil
+    }
+
+    static func markBackedUp(_ ids: [UUID]) {
+        UserDefaults.standard.set(ids.map(\.uuidString), forKey: backedUpKey)
+        UserDefaults.standard.removeObject(forKey: dismissedKey)
+        NotificationCenter.default.post(name: .backupMade, object: nil)
+    }
+
+    static func dismiss(_ ids: [UUID]) {
+        UserDefaults.standard.set(ids.map(\.uuidString), forKey: dismissedKey)
+    }
+}
+
 enum LegacyDataMigration {
     static let legacyBundleID = "com.yourname.GlassOTP"
     private static let doneKey = "GlassOTP.legacyMigrationDone"

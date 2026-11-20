@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import PDFKit
 
 final class StatusBarController: NSObject {
     let statusItem: NSStatusItem
@@ -55,6 +56,13 @@ final class StatusBarController: NSObject {
             self,
             selector: #selector(handleAutoClose),
             name: .autoClosePopover,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(exportTokens),
+            name: .backupRequested,
             object: nil
         )
 
@@ -350,6 +358,7 @@ final class StatusBarController: NSObject {
         menu.addItem(.separator())
 
         menu.addItem(item("Export", #selector(exportTokens)))
+        menu.addItem(item("Print Backup…", #selector(printBackup)))
         menu.addItem(item("Import", #selector(importTokens)))
 
         menu.addItem(.separator())
@@ -459,6 +468,7 @@ final class StatusBarController: NSObject {
                     try data.write(to: url)
 
                     DispatchQueue.main.async {
+                        BackupReminder.markBackedUp(tokens.map(\.id))
                         NotificationService.shared.show(
                             title: "Export complete",
                             body: "Backup saved successfully"
@@ -477,11 +487,71 @@ final class StatusBarController: NSObject {
         }
     }
 
+    @objc private func printBackup() {
+        guard !store.tokens.isEmpty else {
+            showAlert(title: "Nothing to print", text: "Add an account first.")
+            return
+        }
+        DeviceAuth.authenticate(reason: "print a paper backup of your OTP secrets") { [weak self] granted in
+            guard granted else { return }
+            self?.performPrintBackup()
+        }
+    }
+
+    private func performPrintBackup() {
+        let tokens = store.tokens
+        let codes = Dictionary(uniqueKeysWithValues: tokens.map { token in
+            (token.id, ((try? store.recoveryCodes(for: token.id)) ?? []).filter { !$0.isUsed })
+        })
+
+        let alert = NSAlert()
+        alert.messageText = "Print a paper backup?"
+        alert.informativeText = "Each account is printed as a QR code with its secret. Anyone who sees the page can generate your codes, so use a printer you trust and keep the page somewhere safe. The print dialog can also save a PDF — that file is just as sensitive."
+        alert.addButton(withTitle: "Print…")
+        alert.addButton(withTitle: "Cancel")
+        let includeCodes = NSButton(checkboxWithTitle: "Include recovery codes", target: nil, action: nil)
+        includeCodes.state = .on
+        if codes.values.contains(where: { !$0.isEmpty }) {
+            alert.accessoryView = includeCodes
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let entries = tokens.compactMap { token -> PaperBackupEntry? in
+            guard let secret = store.secret(for: token) else { return nil }
+            let recovery = includeCodes.state == .on ? codes[token.id] ?? [] : []
+            return PaperBackupEntry(token: token, secret: secret, recoveryCodes: recovery)
+        }
+        guard entries.count == tokens.count else {
+            showAlert(title: "Couldn't print the backup", text: "Some secrets couldn't be read from the Keychain.")
+            return
+        }
+
+        let printInfo = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo.shared
+        printInfo.topMargin = 0
+        printInfo.bottomMargin = 0
+        printInfo.leftMargin = 0
+        printInfo.rightMargin = 0
+        let pdf = PaperBackup.pdf(entries, paper: printInfo.paperSize)
+        guard let document = PDFDocument(data: pdf),
+              let operation = document.printOperation(for: printInfo, scalingMode: .pageScaleDownToFit, autoRotate: false) else {
+            showAlert(title: "Couldn't print the backup", text: "The backup page couldn't be prepared.")
+            return
+        }
+        operation.jobTitle = "GlassOTP backup"
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
+        NSApp.activate(ignoringOtherApps: true)
+        if operation.run() {
+            BackupReminder.markBackedUp(tokens.map(\.id))
+        }
+    }
+
     @objc private func importTokens() {
         let panel = NSOpenPanel()
         panel.allowedFileTypes = FileImportService.fileTypes
         panel.canChooseDirectories = true
-        panel.message = "Choose a GlassOTP backup, an export from 2FAS, Aegis, Authenticator Pro or Bitwarden, a Steam Desktop Authenticator .maFile or maFiles folder, or a text file with otpauth:// links."
+        panel.message = "Choose a GlassOTP backup, an export from 2FAS, Aegis, Authenticator Pro, Bitwarden, Apple Passwords, 1Password or KeePassXC, a Steam Desktop Authenticator .maFile or maFiles folder, or a text file with otpauth:// links."
 
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }

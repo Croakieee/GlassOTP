@@ -40,37 +40,9 @@ struct TokenQRView: View {
         .frame(width: 300)
     }
 
-    private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-
     private func generateQR() -> NSImage? {
         guard let secret = store.secret(for: token) else { return nil }
-
-        // Label path components must encode `:` (issuer:account separator) and `/` (path separator).
-        let labelCharSet = Self.unreserved
-
-        let issuerEncoded  = token.issuer.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
-        let accountEncoded = token.account.addingPercentEncoding(withAllowedCharacters: labelCharSet) ?? ""
-
-        let label: String
-        if issuerEncoded.isEmpty {
-            label = accountEncoded
-        } else if accountEncoded.isEmpty {
-            label = issuerEncoded
-        } else {
-            label = "\(issuerEncoded):\(accountEncoded)"
-        }
-
-        let issuerQuery = token.issuer.addingPercentEncoding(withAllowedCharacters: Self.unreserved) ?? ""
-        // algorithm must be included — otherwise a re-scanned SHA256/SHA512 token is read back as SHA1.
-        let url: String
-        switch token.kind {
-        case .steam:
-            url = "otpauth://steam/\(label)?secret=\(secret)&issuer=\(issuerQuery)"
-        case .hotp:
-            url = "otpauth://hotp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&counter=\(token.counter)&digits=\(token.digits)"
-        case .totp:
-            url = "otpauth://totp/\(label)?secret=\(secret)&issuer=\(issuerQuery)&algorithm=\(token.algorithm.rawValue)&period=\(token.period)&digits=\(token.digits)"
-        }
+        let url = ImportExportService.link(for: token, secret: secret)
 
         filter.setValue(Data(url.utf8), forKey: "inputMessage")
 

@@ -18,6 +18,7 @@ struct RootPopoverView: View {
     @State private var unlocked: Bool = false
     @State private var authInProgress: Bool = false
     @State private var unlockPromptID: UUID?
+    @State private var backupReminder: BackupReminder.Status?
     @State private var unlockedUntil: Date?
 
     // rename
@@ -105,6 +106,7 @@ struct RootPopoverView: View {
             applyLockOnOpen()
             refreshNotificationStatus()
             refreshClipboard()
+            refreshBackupReminder()
         }
         .onReceive(NotificationCenter.default.publisher(for: .popoverDidShow)) { note in
             revealedIDs = []
@@ -112,6 +114,7 @@ struct RootPopoverView: View {
             applyLockOnOpen()
             refreshNotificationStatus()
             refreshClipboard()
+            refreshBackupReminder()
             keyboardActive = note.userInfo?[PopoverUserInfo.openedViaHotKey] as? Bool ?? false
             selectedID = store.filteredTokens().first?.id
             if let delay = note.userInfo?[PopoverUserInfo.unlockPromptDelay] as? NSNumber {
@@ -150,6 +153,12 @@ struct RootPopoverView: View {
         }
         .onChange(of: appState.suggestFromClipboard) { _ in
             refreshClipboard()
+        }
+        .onChange(of: store.tokens) { _ in
+            refreshBackupReminder()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .backupMade)) { _ in
+            refreshBackupReminder()
         }
         .onChange(of: appState.requireUnlock) { enabled in
             // Enabling locks immediately; disabling reveals the content.
@@ -332,6 +341,29 @@ struct RootPopoverView: View {
                 onCheck: { clipboard.check(store: store) },
                 onDismiss: { clipboard.dismiss() }
             )
+        }
+        if showContent, let backupReminder {
+            HStack(spacing: 0) {
+                warningLine(icon: "archivebox", text: backupReminderText(backupReminder), color: .secondary)
+                Button("Back Up…") {
+                    NotificationCenter.default.post(name: .backupRequested, object: nil)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .font(.footnote)
+                .foregroundColor(.accentColor)
+                .padding(.trailing, 6)
+                Button(action: {
+                    BackupReminder.dismiss(store.tokens.map(\.id))
+                    refreshBackupReminder()
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .foregroundColor(.secondary)
+                .help("Hide until you add another account")
+                .padding(.trailing, 6)
+            }
         }
         if let id = undoDeletedID, let item = store.trash.first(where: { $0.id == id }) {
             HStack(spacing: 0) {
@@ -726,6 +758,19 @@ struct RootPopoverView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + lifetime) {
             guard quickAddGeneration == generation else { return }
             quickAddFeedback = nil
+        }
+    }
+
+    private func refreshBackupReminder() {
+        backupReminder = BackupReminder.status(for: store.tokens)
+    }
+
+    private func backupReminderText(_ status: BackupReminder.Status) -> String {
+        switch status {
+        case .noRecord:
+            return "Make a backup of your accounts."
+        case .newAccounts(let count):
+            return count == 1 ? "1 account added since the last backup." : "\(count) accounts added since the last backup."
         }
     }
 

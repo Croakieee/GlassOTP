@@ -29,6 +29,7 @@
 - [Backup & restore](#backup--restore)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
+- [Coming next](#coming-next)
 - [Notes & limitations](#notes--limitations)
 - [Building from source](#building-from-source)
 
@@ -47,7 +48,7 @@
 **Flexible import**
 
 - Time-based (**TOTP**), counter-based (**HOTP**) and **Steam Guard** codes
-- **Move from another app** — 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth, Bitwarden and Steam Desktop Authenticator exports, password-protected ones too
+- **Move from another app** — 2FAS, Aegis, Authenticator Pro, Proton Authenticator, Ente Auth, Bitwarden, Apple Passwords, 1Password, KeePassXC and Steam Desktop Authenticator exports, password-protected ones too
 - Text files or pasted blocks with many `otpauth://` links at once
 - `otpauth://totp/…`, `otpauth://hotp/…`, `otpauth://steam/…` links and **Google Authenticator** exports (`otpauth-migration://…`)
 - QR codes from an image or PDF, drag & drop, the clipboard, the **camera** or **anywhere on your screen**
@@ -61,7 +62,7 @@
 - **Protected tokens** — keep a single code hidden until you confirm with Touch ID
 - **Recovery codes** — keep a site's backup codes next to the token, in the Keychain, behind Touch ID; paste them or scan a screenshot
 - Touch ID required to show secrets and QR codes, export a backup or delete everything
-- Encrypted, password-protected backups
+- Encrypted, password-protected backups and a printable **paper backup** with a QR code for every account
 - **No network connections** — nothing is synced, sent or uploaded
 
 **Comfortable**
@@ -248,12 +249,16 @@ Export your accounts in the other app, then right-click the key icon → **Impor
 | **Proton Authenticator** | `.json` export | Supported |
 | **Ente Auth** | Plain-text export (`.txt`) | Not supported — export as plain text |
 | **Bitwarden** | `.json` or `.csv` vault export | Not supported — export without a password |
+| **Apple Passwords** | **File → Export All Passwords** (`.csv`) | — |
+| **1Password** | **File → Export** in 1PUX format (`.1pux`) | — |
+| **KeePassXC** | **Database → Export → CSV File** (`.csv`) | — |
 | **Any app** | A text file with `otpauth://` links, one per line | — |
 | **Steam Desktop Authenticator** | See [below](#from-steam-desktop-authenticator) | Supported |
 
 - Accounts that already exist in GlassOTP are skipped.
 - Accounts GlassOTP can't generate codes for (for example Yandex, mOTP or 7-digit codes) are skipped and counted in the result.
-- Delete the export file afterwards — it contains your secrets.
+- Only entries with a one-time password are imported; passwords and other fields are ignored.
+- Delete the export file afterwards — it contains your secrets, and a password manager export contains your passwords too.
 
 ### Link a Steam account
 
@@ -334,6 +339,7 @@ Open **Recently Deleted…** from the settings menu to **Restore** a token or de
 
 - **Open** — show the token list
 - **Export / Import** — [backup & restore](#backup--restore); **Import** also reads exports from [other authenticator apps](#from-another-authenticator-app)
+- **Print Backup…** — a [paper backup](#paper-backup) of all accounts
 - **Delete All** — remove every token and reset the secret storage *(requires Touch ID / password)*
 - **Pin popover** — keep the list open when you click elsewhere
 - **Launch at login** — start GlassOTP when you log in. Enable it from the copy in **Applications**; if you move the app, turn it on again, and turn it off before deleting the app.
@@ -369,6 +375,17 @@ From the right-click menu:
 
 > The backup file contains all your secrets. Choose a strong password and keep the file somewhere safe.
 
+### Paper backup
+
+Right-click the key icon → **Print Backup…** and authenticate. Every account is printed on a card with its QR code, type and secret, so you can restore it by scanning the code in GlassOTP or any authenticator app, or by typing the secret in. Unused recovery codes are printed too unless you turn off **Include recovery codes**.
+
+- The print dialog shows a preview and can also save a PDF. That file is as sensitive as the paper — don't leave it on your Mac.
+- HOTP cards show the counter at the time of printing.
+
+### Backup reminder
+
+When accounts were added since the last export or paper backup, the list shows a short line with a **Back Up…** button. Click **×** to hide it until you add another account.
+
 ## Security
 
 - Token secrets live in the **macOS Keychain**, never as plain text on disk.
@@ -401,6 +418,11 @@ From the right-click menu:
 - **Add to GlassOTP is missing from the Services menu** — make sure GlassOTP is in your Applications folder and has been opened once, then enable it in System Settings → Keyboard → Keyboard Shortcuts → Services. If it still doesn't appear, log out and back in — macOS refreshes the Services list only then.
 - **An `otpauth://` link opens another app** — another authenticator on this Mac also handles these links and macOS chose it. Copy the link and use **Paste** in the Add window.
 - **⌥⌘O does nothing** — another app may already use this shortcut. Turn off **Global shortcut ⌥⌘O** in settings and use the menu bar icon instead.
+
+## Coming next
+
+- **New Keychain storage** — secrets move to the modern Keychain, so macOS stops asking for your login password after updates. On top of that, optional sync between your Macs through iCloud Keychain, off by default.
+- **Mac App Store** — GlassOTP is being prepared for the Mac App Store. GitHub releases and Homebrew stay.
 
 ## Notes & limitations
 
