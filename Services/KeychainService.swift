@@ -55,6 +55,14 @@ struct KeychainService {
 
     private static var loadFailure: Error?
 
+    static let usesDataProtectionKeychain: Bool = {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let groups = SecTaskCopyValueForEntitlement(task, "keychain-access-groups" as CFString, nil) as? [String] else {
+            return false
+        }
+        return !groups.isEmpty
+    }()
+
     /// Legacy per-token account name. Retained for reference / migration; the format of the
     /// items the migration reads.
     static func key(for id: UUID) -> String {
@@ -129,12 +137,17 @@ struct KeychainService {
         lock.lock()
         defer { lock.unlock() }
 
-        if let raw = try readItemData(account: vaultAccount),
-           (try? JSONDecoder().decode([String: Data].self, from: raw)) == nil {
-            try writeItem(account: damagedVaultAccount, data: raw)
+        for modern in stores {
+            if let raw = try readItemData(account: vaultAccount, modern: modern),
+               (try? JSONDecoder().decode([String: Data].self, from: raw)) == nil {
+                try writeItem(account: damagedVaultAccount, data: raw, modern: modern)
+            }
         }
 
-        deleteItems(accounts: [vaultAccount] + legacyAccounts())
+        if usesDataProtectionKeychain {
+            deleteItems(accounts: [vaultAccount], modern: true)
+        }
+        deleteItems(accounts: [vaultAccount] + legacyAccounts(), modern: false)
         vault = [:]
         pendingLegacyAccounts = []
         loadFailure = nil
@@ -162,8 +175,29 @@ struct KeychainService {
     }
 
     private static func readVaultLocked() throws {
+        if usesDataProtectionKeychain {
+            if let data = try readItemData(account: vaultAccount, modern: true) {
+                guard let decoded = try? JSONDecoder().decode([String: Data].self, from: data) else {
+                    throw KeychainError.decode
+                }
+                vault = decoded
+                return
+            }
+            if let data = try readItemData(account: vaultAccount, modern: false) {
+                guard let decoded = try? JSONDecoder().decode([String: Data].self, from: data) else {
+                    throw KeychainError.decode
+                }
+                try writeItem(account: vaultAccount, data: data, modern: true)
+                guard try readItemData(account: vaultAccount, modern: true) == data else {
+                    throw KeychainError.copy(errSecDataNotAvailable)
+                }
+                vault = decoded
+                return
+            }
+        }
+
         // 1) Try the consolidated blob.
-        if let data = try readItemData(account: vaultAccount) {
+        if let data = try readItemData(account: vaultAccount, modern: false) {
             guard let decoded = try? JSONDecoder().decode([String: Data].self, from: data) else {
                 throw KeychainError.decode
             }
@@ -185,22 +219,36 @@ struct KeychainService {
 
     private static func persistVaultLocked(_ contents: [String: Data]) throws {
         let data = try JSONEncoder().encode(contents)
-        try writeItem(account: vaultAccount, data: data)
+        try writeItem(account: vaultAccount, data: data, modern: usesDataProtectionKeychain)
 
         if !pendingLegacyAccounts.isEmpty {
-            deleteItems(accounts: pendingLegacyAccounts)
+            deleteItems(accounts: pendingLegacyAccounts, modern: false)
             pendingLegacyAccounts = []
         }
     }
 
     // MARK: - Raw item helpers
 
-    private static func writeItem(account: String, data: Data) throws {
-        let query: [String: Any] = [
+    private static var stores: [Bool] {
+        usesDataProtectionKeychain ? [true, false] : [false]
+    }
+
+    private static func baseQuery(account: String?, modern: Bool) -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrService as String: service
         ]
+        if let account {
+            query[kSecAttrAccount as String] = account
+        }
+        if modern {
+            query[kSecUseDataProtectionKeychain as String] = true
+        }
+        return query
+    }
+
+    private static func writeItem(account: String, data: Data, modern: Bool) throws {
+        let query = baseQuery(account: account, modern: modern)
         let attrs: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
@@ -217,27 +265,18 @@ struct KeychainService {
         if addStatus != errSecSuccess { throw KeychainError.add(addStatus) }
     }
 
-    private static func deleteItems(accounts: [String]) {
+    private static func deleteItems(accounts: [String], modern: Bool) {
         for account in accounts {
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecAttrAccount as String: account
-            ]
-            SecItemDelete(query as CFDictionary)
+            SecItemDelete(baseQuery(account: account, modern: modern) as CFDictionary)
         }
     }
 
     /// Reads a single item's data. Returns `nil` only when the item doesn't exist.
     /// Reading the data may trigger the ACL prompt (this is where the password dialog appears).
-    private static func readItemData(account: String) throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+    private static func readItemData(account: String, modern: Bool) throws -> Data? {
+        var query = baseQuery(account: account, modern: modern)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         switch status {
@@ -254,12 +293,9 @@ struct KeychainService {
     // MARK: - One-time migration from per-token items
 
     private static func legacyAccounts() -> [String] {
-        let listQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
-        ]
+        var listQuery = baseQuery(account: nil, modern: false)
+        listQuery[kSecReturnAttributes as String] = true
+        listQuery[kSecMatchLimit as String] = kSecMatchLimitAll
         var result: CFTypeRef?
         let status = SecItemCopyMatching(listQuery as CFDictionary, &result)
         guard status == errSecSuccess, let items = result as? [[String: Any]] else {
@@ -275,7 +311,7 @@ struct KeychainService {
         var accounts: [String] = []
 
         for account in legacyAccounts() {
-            guard let data = (try? readItemData(account: account)) ?? nil else { continue }
+            guard let data = (try? readItemData(account: account, modern: false)) ?? nil else { continue }
             secrets[String(account.dropFirst(legacyPrefix.count))] = data
             accounts.append(account)
         }

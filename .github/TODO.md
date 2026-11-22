@@ -2,11 +2,13 @@
 
 ## Next
 
-* New Keychain storage:
+* Remove the old login Keychain copy of the vault (kept since 2.0.3 for going back)
 
-  * Move secrets to the modern Keychain with a team access group
-  * No login password prompts after updates
-  * Optional sync between Macs through iCloud Keychain, off by default
+* Sync between Macs through iCloud Keychain, off by default:
+
+  * One Keychain item per account instead of one vault
+  * Sync the account list, names, order and Recently Deleted too
+  * Merge changes from several Macs
 
 * Mac App Store version:
 
