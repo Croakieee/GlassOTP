@@ -103,6 +103,10 @@ GlassOTP 2.0 is signed with a Developer ID and notarized by Apple, so macOS open
 
 Export a backup before updating, just in case.
 
+### Updating to 2.0.3
+
+On the first launch 2.0.3 moves your secrets to the modern data protection Keychain. Nothing to do on your side. The old copy stays in the login Keychain for now, so an earlier version still opens your accounts if you go back; accounts added after the update exist only in the new storage. **Delete All** removes both.
+
 ## Getting started
 
 Click the key icon in the menu bar (or press **⌥⌘O**). The list is empty at first — press **+** to add your first token.
@@ -392,7 +396,7 @@ When accounts were added since the last export or paper backup, the list shows a
 
 ## Security
 
-- Token secrets live in the **macOS Keychain**, never as plain text on disk.
+- Token secrets live in the **macOS Keychain**, never as plain text on disk. Since 2.0.3 they are in the modern data protection Keychain, which only GlassOTP builds signed by its developer can read.
 - GlassOTP makes **no network connections** — all data stays on your Mac.
 - **Touch ID** or your macOS password is required to view or edit a secret, show a QR code, open recovery codes, export a backup and delete all tokens. Authentication is remembered for a short time to avoid repeated prompts — except for protected tokens and recovery codes, which always ask.
 - **Require Touch ID to view** hides all codes until you authenticate, every time the list opens — or, with **Stay unlocked**, for up to 15 minutes after you authenticate. Locking the screen or sleep locks it again. Protected tokens and recovery codes always ask.
@@ -425,7 +429,7 @@ When accounts were added since the last export or paper backup, the list shows a
 
 ## Coming next
 
-- **New Keychain storage** — secrets move to the modern Keychain, so macOS stops asking for your login password after updates. On top of that, optional sync between your Macs through iCloud Keychain, off by default.
+- **Sync between your Macs** — optional, through iCloud Keychain, off by default.
 - **Mac App Store** — GlassOTP is being prepared for the Mac App Store. GitHub releases and Homebrew stay.
 
 ## Notes & limitations
@@ -444,7 +448,7 @@ cd GlassOTP
 open GlassOTP.xcodeproj
 ```
 
-Build and run the **GlassOTP** scheme. The project is set up with the author's signing team: pick your own team, or **Sign to Run Locally**, under Signing & Capabilities.
+Build and run the **GlassOTP** scheme. The project is set up with the author's signing team: pick your own team under Signing & Capabilities. To build without a team, also remove **Keychain Sharing** there and choose **Sign to Run Locally** — GlassOTP then keeps secrets in the older login Keychain storage.
 
 ## Contributing
 
